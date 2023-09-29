@@ -3,6 +3,7 @@ package dedup
 import (
 	"context"
 	"log/slog"
+	"strings"
 
 	"modernc.org/b/v2"
 )
@@ -11,18 +12,43 @@ import (
 // TODO: also create a sorting middleware as well
 // TODO: also create a pretty json printer that still prints to only 1 line, just prettier
 
-// OverwriteHandlerOptions are options for a OverwriteHandler
+var (
+	// TimeKey is the key used by the built-in handlers for the time when the log method is called.
+	// Set before instantiating any handlers.
+	TimeKey = slog.TimeKey
+
+	// LevelKey is the key used by the built-in handlers for the level of the log call.
+	// Set before instantiating any handlers.
+	LevelKey = slog.LevelKey
+
+	// MessageKey is the key used by the built-in handlers for the message of the log call.
+	// Set before instantiating any handlers.
+	MessageKey = slog.MessageKey
+
+	// SourceKey is the key used by the built-in handlers for the source file and line of the log call.
+	// Set before instantiating any handlers.
+	SourceKey = slog.SourceKey
+)
+
+// OverwriteHandlerOptions are options for a OverwriteHandler. An empty options struct is NOT valid.
 type OverwriteHandlerOptions struct {
-	// TODO: maybe put the comparison function here?
+	// Comparison function to determine if two keys are equal
+	KeyCompare func(a, b string) int
+
+	// Function that will be called on all root level (not in a group) attribute keys.
+	// Returns the new key value to use, and true to keep the attribute or false to drop it.
+	// Can be used to drop, keep, or rename any attributes matching the builtin attributes.
+	ResolveBuiltinKeyConflict func(k string) (string, bool)
 }
 
 // OverwriteHandler is a slog.Handler middleware that will deduplicate all attributes and
 // groups by overwriting any older attributes or groups with the same string key.
 // It passes the final record and attributes off to the next handler when finished.
 type OverwriteHandler struct {
-	next slog.Handler
-	opts *OverwriteHandlerOptions
-	goa  *groupOrAttrs
+	next       slog.Handler
+	goa        *groupOrAttrs
+	keyCompare func(a, b string) int
+	getKey     func(key string, depth int) (string, bool)
 }
 
 var _ slog.Handler = &OverwriteHandler{} // Assert conformance with interface
@@ -35,7 +61,18 @@ func NewOverwriteHandler(next slog.Handler, opts *OverwriteHandlerOptions) *Over
 	if opts == nil {
 		opts = &OverwriteHandlerOptions{}
 	}
-	return &OverwriteHandler{next: next, opts: opts}
+	if opts.KeyCompare == nil {
+		opts.KeyCompare = CaseSensitiveCmp
+	}
+	if opts.ResolveBuiltinKeyConflict == nil {
+		opts.ResolveBuiltinKeyConflict = IncrementIfBuiltinKeyConflict
+	}
+
+	return &OverwriteHandler{
+		next:       next,
+		keyCompare: opts.KeyCompare,
+		getKey:     getKeyClosure(opts.ResolveBuiltinKeyConflict),
+	}
 }
 
 // Enabled reports whether the handler handles records at the given level.
@@ -56,8 +93,8 @@ func (h *OverwriteHandler) Handle(ctx context.Context, r slog.Record) error {
 	goas := collectGroupOrAttrs(h.goa, &groupOrAttrs{attrs: finalAttrs})
 
 	// Resolve groups and with-attributes
-	uniq := b.TreeNew[string, any](strCmp)
-	createAttrTree(uniq, goas, 0)
+	uniq := b.TreeNew[string, any](h.keyCompare)
+	createAttrTree(uniq, goas, 0, h.keyCompare, h.getKey)
 
 	// Add all attributes to new record (because old record has all the old attributes)
 	newR := &slog.Record{
@@ -89,44 +126,33 @@ func (h *OverwriteHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
 
 // createAttrTree recursively goes through all groupOrAttrs, resolving their attributes and creating subtrees as
 // necessary, adding the results to the map
-func createAttrTree(uniq *b.Tree[string, any], goas []*groupOrAttrs, depth int) {
+func createAttrTree(uniq *b.Tree[string, any], goas []*groupOrAttrs, depth int, keyCompare func(a, b string) int, getKey func(key string, depth int) (string, bool)) {
 	if len(goas) == 0 {
 		return
 	}
 
 	// If a group is encountered, create a subtree for that group and all groupOrAttrs after it
 	if goas[0].group != "" {
-		uniqGroup := b.TreeNew[string, any](strCmp)
-		createAttrTree(uniqGroup, goas[1:], depth+1)
-		// Ignore empty groups, otherwise put subtree into the map
-		if uniqGroup.Len() > 0 {
-			uniq.Set(getKey(goas[0].group, depth), uniqGroup)
+		if key, ok := getKey(goas[0].group, depth); ok {
+			uniqGroup := b.TreeNew[string, any](keyCompare)
+			createAttrTree(uniqGroup, goas[1:], depth+1, keyCompare, getKey)
+			// Ignore empty groups, otherwise put subtree into the map
+			if uniqGroup.Len() > 0 {
+				uniq.Set(key, uniqGroup)
+			}
+			return
 		}
-		return
 	}
 
 	// Otherwise, set all attributes for this groupOrAttrs, and then call again for remaining groupOrAttrs's
-	resolveValues(uniq, goas[0].attrs, depth)
-	createAttrTree(uniq, goas[1:], depth)
-}
-
-// getKey resolves a key, making sure not to overwrite the 4 built-in attribute keys (time, level, msg, source).
-// TODO: what behavior do we want for the OverwriteHandler when an attribute is using the built-in keys?
-// Technically, because the built-in keys are set last, they would always overwrite any attributes with the same key,
-// effectively meaning that those attributes never existed.
-func getKey(key string, depth int) string {
-	if depth == 0 {
-		if key == slog.TimeKey || key == slog.LevelKey || key == slog.MessageKey || key == slog.SourceKey {
-			return key + "#01" // Don't overwrite the built-in attribute keys
-		}
-	}
-	return key
+	resolveValues(uniq, goas[0].attrs, depth, keyCompare, getKey)
+	createAttrTree(uniq, goas[1:], depth, keyCompare, getKey)
 }
 
 // resolveValues iterates through the attributes, resolving them and putting them into the map.
 // If a group is encountered (as an attribute), it will be separately resolved and added as a subtree.
 // Since attributes are ordered from oldest to newest, it overwrites keys as it goes.
-func resolveValues(uniq *b.Tree[string, any], attrs []slog.Attr, depth int) {
+func resolveValues(uniq *b.Tree[string, any], attrs []slog.Attr, depth int, keyCompare func(a, b string) int, getKey func(key string, depth int) (string, bool)) {
 	for _, a := range attrs {
 		a.Value = a.Value.Resolve()
 		if a.Equal(slog.Attr{}) {
@@ -134,25 +160,29 @@ func resolveValues(uniq *b.Tree[string, any], attrs []slog.Attr, depth int) {
 		}
 
 		// Default situation: resolve the key and put it into the map
-		a.Key = getKey(a.Key, depth)
+		key, ok := getKey(a.Key, depth)
+		if !ok {
+			continue
+		}
+
 		if a.Value.Kind() != slog.KindGroup {
-			uniq.Set(a.Key, a)
+			uniq.Set(key, a)
 			continue
 		}
 
 		// Groups with empty keys are inlined
-		if a.Key == "" {
-			resolveValues(uniq, a.Value.Group(), depth)
+		if key == "" {
+			resolveValues(uniq, a.Value.Group(), depth, keyCompare, getKey)
 			continue
 		}
 
 		// Create a subtree for this group
-		uniqGroup := b.TreeNew[string, any](strCmp)
-		resolveValues(uniqGroup, a.Value.Group(), depth+1)
+		uniqGroup := b.TreeNew[string, any](keyCompare)
+		resolveValues(uniqGroup, a.Value.Group(), depth+1, keyCompare, getKey)
 
 		// Ignore empty groups, otherwise put subtree into the map
 		if uniqGroup.Len() > 0 {
-			uniq.Set(a.Key, uniqGroup)
+			uniq.Set(key, uniqGroup)
 		}
 	}
 }
@@ -240,7 +270,56 @@ func collectGroupOrAttrs(gs ...*groupOrAttrs) []*groupOrAttrs {
 	return res
 }
 
-func strCmp(a, b string) int {
+// getKeyClosure returns a function to be used to resolve a key at the root level, determining its behavior when it
+// would otherwise conflict/duplicate the 4 built-in attribute keys (time, level, msg, source).
+func getKeyClosure(resolveBuiltinKeyConflict func(k string) (string, bool)) func(key string, depth int) (string, bool) {
+	return func(key string, depth int) (string, bool) {
+		if depth == 0 {
+			return resolveBuiltinKeyConflict(key)
+		}
+		return key, true
+	}
+}
+
+// IncrementIfBuiltinKeyConflict will, if there is a conflict/duplication at the root level (not in a group) with one of
+// the built-in keys, add "#01" to the end of the key
+func IncrementIfBuiltinKeyConflict(key string) (string, bool) {
+	if key == TimeKey || key == LevelKey || key == MessageKey || key == SourceKey {
+		return key + "#01", true // Don't overwrite the built-in attribute keys
+	}
+	return key, true
+}
+
+// DropIfBuiltinKeyConflict will, if there is a conflict/duplication at the root level (not in a group) with one of the
+// built-in keys, drop the whole attribute
+func DropIfBuiltinKeyConflict(key string) (string, bool) {
+	if key == TimeKey || key == LevelKey || key == MessageKey || key == SourceKey {
+		return "", false // Drop the attribute
+	}
+	return key, true
+}
+
+// KeepIfBuiltinKeyConflict will keep all keys even if there would be a conflict/duplication at the root level (not in a
+// group) with one of the built-in keys
+func KeepIfBuiltinKeyConflict(key string) (string, bool) {
+	return key, true // Keep all
+}
+
+// CaseSensitiveCmp is a case-sensitive comparison and ordering function that orders by byte values
+func CaseSensitiveCmp(a, b string) int {
+	if a == b {
+		return 0
+	}
+	if a > b {
+		return 1
+	}
+	return -1
+}
+
+// CaseInsensitiveCmp is a case-insensitive comparison and ordering function that orders by byte values
+func CaseInsensitiveCmp(a, b string) int {
+	a = strings.ToLower(a)
+	b = strings.ToLower(b)
 	if a == b {
 		return 0
 	}
