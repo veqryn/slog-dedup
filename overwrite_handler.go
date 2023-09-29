@@ -160,18 +160,19 @@ func resolveValues(uniq *b.Tree[string, any], attrs []slog.Attr, depth int, keyC
 		}
 
 		// Default situation: resolve the key and put it into the map
-		key, ok := getKey(a.Key, depth)
+		var ok bool
+		a.Key, ok = getKey(a.Key, depth)
 		if !ok {
 			continue
 		}
 
 		if a.Value.Kind() != slog.KindGroup {
-			uniq.Set(key, a)
+			uniq.Set(a.Key, a)
 			continue
 		}
 
 		// Groups with empty keys are inlined
-		if key == "" {
+		if a.Key == "" {
 			resolveValues(uniq, a.Value.Group(), depth, keyCompare, getKey)
 			continue
 		}
@@ -182,7 +183,7 @@ func resolveValues(uniq *b.Tree[string, any], attrs []slog.Attr, depth int, keyC
 
 		// Ignore empty groups, otherwise put subtree into the map
 		if uniqGroup.Len() > 0 {
-			uniq.Set(key, uniqGroup)
+			uniq.Set(a.Key, uniqGroup)
 		}
 	}
 }

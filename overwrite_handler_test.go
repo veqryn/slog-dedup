@@ -1,26 +1,168 @@
 package dedup
 
 import (
+	"bytes"
+	"context"
 	"log/slog"
-	"os"
+	"strings"
 	"testing"
+	"time"
 )
 
+type testHandler struct {
+	Ctx    context.Context
+	Record slog.Record
+}
+
+func (h *testHandler) Enabled(context.Context, slog.Level) bool {
+	return true
+}
+
+func (h *testHandler) Handle(ctx context.Context, r slog.Record) error {
+	h.Ctx = ctx
+	h.Record = r
+	h.Record.Time = time.Date(2023, 9, 29, 13, 0, 59, 0, time.UTC)
+	return nil
+}
+
+func (h *testHandler) WithGroup(string) slog.Handler {
+	panic("shouldn't be called")
+}
+
+func (h *testHandler) WithAttrs([]slog.Attr) slog.Handler {
+	panic("shouldn't be called")
+}
+
+func (h *testHandler) String() string {
+	buf := &bytes.Buffer{}
+	err := slog.NewTextHandler(buf, &slog.HandlerOptions{Level: slog.LevelDebug}).Handle(context.Background(), h.Record)
+	if err != nil {
+		panic(err)
+	}
+	return buf.String()
+}
+
+func (h *testHandler) MarshalJSON() ([]byte, error) {
+	buf := &bytes.Buffer{}
+	err := slog.NewJSONHandler(buf, &slog.HandlerOptions{Level: slog.LevelDebug}).Handle(context.Background(), h.Record)
+	if err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func checkRecordForDuplicates(t *testing.T, r slog.Record) {
+	t.Helper()
+
+	attrs := make([]slog.Attr, 0, r.NumAttrs()+4)
+	attrs = append(attrs,
+		slog.Time(slog.TimeKey, r.Time),
+		slog.Int(slog.LevelKey, int(r.Level)),
+		slog.String(slog.MessageKey, r.Message),
+		slog.String(slog.SourceKey, "SOURCE"),
+	)
+	r.Attrs(func(a slog.Attr) bool {
+		attrs = append(attrs, a)
+		return true
+	})
+
+	checkForDuplicates(t, attrs)
+}
+
+func checkForDuplicates(t *testing.T, attrs []slog.Attr) {
+	t.Helper()
+
+	seen := make(map[string]struct{}, len(attrs))
+	for _, a := range attrs {
+		if _, ok := seen[a.Key]; ok {
+			t.Errorf("Duplicate key found: %v", a)
+		}
+		if a.Equal(slog.Attr{}) {
+			t.Errorf("Empty attributes are not allowed: %v", a)
+		}
+		seen[a.Key] = struct{}{}
+
+		// Dive into any Groups:
+		if a.Value.Kind() == slog.KindGroup {
+			if a.Key == "" {
+				t.Errorf("Groups with empty names should be inlined: %v", a)
+			}
+			checkForDuplicates(t, a.Value.Group())
+		}
+	}
+}
+
+/*
+	{
+		"time": "2023-09-29T13:00:59Z",
+		"level": "INFO",
+		"msg": "main message",
+		"arg1": "with2arg1",
+		"arg2": "with1arg2",
+		"arg3": "with2arg3",
+		"arg4": "with2arg4",
+		"group1": {
+			"arg1": "main1arg1",
+			"arg2": "group1with3arg2",
+			"arg3": "group1with4arg3",
+			"arg4": "group1with4arg4",
+			"arg5": "with4inlinedGroupArg5",
+			"arg6": "main1arg6",
+			"level": "main1level",
+			"main1": "arg0",
+			"main1group3": {
+				"group3": "group3arg0"
+			},
+			"msg": "with4msg",
+			"overwrittenGroup": "with4overwrittenGroup",
+			"separateGroup2": {
+				"arg1": "group2arg1",
+				"arg2": "group2arg2",
+				"group2": "group2arg0"
+			},
+			"source": "with3source",
+			"time": "with3time",
+			"with3": "arg0",
+			"with4": "arg0"
+		},
+		"level#01": "with2level",
+		"msg#01": "with2msg",
+		"source#01": "with1source",
+		"time#01": "with1time",
+		"typed": true,
+		"with1": "arg0",
+		"with2": "arg0"
+	}
+*/
 func TestOverwriteHandler(t *testing.T) {
 	t.Parallel()
 
-	// base := slog.NewTextHandler(os.Stdout, nil)
-	base := slog.NewJSONHandler(os.Stdout, nil)
-	slog.New(base).Info("hello", "", "emptykeysvalue", "emptyvalueskey", "", "foo", "bar", `"quotedkey"`, `"quotedvalue"`)
-	slog.New(NewOverwriteHandler(base, &OverwriteHandlerOptions{})).Info("hello", "", "emptykeysvalue", "emptyvalueskey", "", "foo", "bar", `"quotedkey"`, `"quotedvalue"`)
+	tester := &testHandler{}
+	h := NewOverwriteHandler(tester, nil)
+	log := slog.New(h)
 
-	oh := NewOverwriteHandler(base, &OverwriteHandlerOptions{})
-	log := slog.New(oh)
-
-	log = log.With("with1", "arg0", "arg1", "with1arg1", "arg2", "with1arg2", "arg3", "with1arg3", slog.SourceKey, "with1source")
-	log = log.With("with2", "arg0", "arg1", "with2arg1", "arg3", "with2arg3", "arg4", "with2arg4")
+	log = log.With("with1", "arg0", "arg1", "with1arg1", "arg2", "with1arg2", "arg3", "with1arg3", SourceKey, "with1source", TimeKey, "with1time", slog.Group("emptyGroup"), "typed", "overwritten", slog.Int("typed", 3))
+	log = log.With("with2", "arg0", "arg1", "with2arg1", "arg3", "with2arg3", "arg4", "with2arg4", MessageKey, "with2msg", LevelKey, "with2level", "group1", "with2group1", slog.Bool("typed", true))
 	log = log.WithGroup("group1")
-	log = log.With("with3", "arg0", "arg1", "group1with3arg1", "arg2", "group1with3arg2", "arg3", "group1with3arg3", slog.Group("separateGroup2", "group2", "group2arg0", "arg1", "group2arg1", "arg2", "group2arg2"))
-	log = log.With("with4", "arg0", "arg1", "group1with4arg1", "arg3", "group1with4arg3", "arg4", "group1with4arg4")
-	log.Info("main message", "main1", "arg0", "arg1", "main1arg1", "arg5", "main1arg5")
+	log = log.With("with3", "arg0", "arg1", "group1with3arg1", "arg2", "group1with3arg2", "arg3", "group1with3arg3", slog.Group("overwrittenGroup", "arg", "arg"), slog.Group("separateGroup2", "group2", "group2arg0", "arg1", "group2arg1", "arg2", "group2arg2"), SourceKey, "with3source", TimeKey, "with3time")
+	log = log.WithGroup("").WithGroup("")
+	log = log.With("with4", "arg0", "arg1", "group1with4arg1", "arg3", "group1with4arg3", "arg4", "group1with4arg4", slog.Group("", "arg5", "with4inlinedGroupArg5"), slog.String("overwrittenGroup", "with4overwrittenGroup"), MessageKey, "with4msg", LevelKey, "with4overwritten")
+	log.Info("main message", "main1", "arg0", "arg1", "main1arg1", "arg6", "main1arg6", LevelKey, "main1overwritten", LevelKey, "main1level", slog.Group("main1group3", "group3", "group3overwritten", "group3", "group3arg0"))
+
+	jBytes, err := tester.MarshalJSON()
+	if err != nil {
+		t.Errorf("Unable to marshal json: %v", err)
+	}
+	jStr := strings.TrimSpace(string(jBytes))
+
+	expected := `{"time":"2023-09-29T13:00:59Z","level":"INFO","msg":"main message","arg1":"with2arg1","arg2":"with1arg2","arg3":"with2arg3","arg4":"with2arg4","group1":{"arg1":"main1arg1","arg2":"group1with3arg2","arg3":"group1with4arg3","arg4":"group1with4arg4","arg5":"with4inlinedGroupArg5","arg6":"main1arg6","level":"main1level","main1":"arg0","main1group3":{"group3":"group3arg0"},"msg":"with4msg","overwrittenGroup":"with4overwrittenGroup","separateGroup2":{"arg1":"group2arg1","arg2":"group2arg2","group2":"group2arg0"},"source":"with3source","time":"with3time","with3":"arg0","with4":"arg0"},"level#01":"with2level","msg#01":"with2msg","source#01":"with1source","time#01":"with1time","typed":true,"with1":"arg0","with2":"arg0"}`
+	if jStr != expected {
+		t.Errorf("Expected:\n%s\nGot:\n%s", expected, jStr)
+	}
+
+	// Uncomment to see the results
+	// t.Error(string(js))
+	// t.Error(tester.String())
+
+	checkRecordForDuplicates(t, tester.Record)
 }
