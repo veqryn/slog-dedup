@@ -88,7 +88,12 @@ func CaseInsensitiveCmp(a, b string) int {
 	return -1
 }
 
-// buildAttrs converts the deduplicated map back into an attribute array, with any subtrees converted into slog.Group's
+// appended is a type that exists to allow us to differentiate between a log attribute that is a slice or any's ([]any),
+// versus when we are appending to the key so that it becomes a slice.
+type appended []any
+
+// buildAttrs converts the deduplicated map back into an attribute array,
+// with any subtrees converted into slog.Group's
 func buildAttrs(uniq *b.Tree[string, any]) []slog.Attr {
 	en, err := uniq.SeekFirst()
 	if err != nil {
@@ -99,18 +104,48 @@ func buildAttrs(uniq *b.Tree[string, any]) []slog.Attr {
 	// Iterate through all values in the map, add to slice
 	attrs := make([]slog.Attr, 0, uniq.Len())
 	for k, i, err := en.Next(); err == nil; k, i, err = en.Next() {
-		// Values will either be an attribute, or a subtree
+		// Values will either be an attribute, a subtree, or a specially appended slice of the former two
 		switch v := i.(type) {
 		case slog.Attr:
 			attrs = append(attrs, v)
 		case *b.Tree[string, any]:
 			// Convert subtree into a group
 			attrs = append(attrs, slog.Attr{Key: k, Value: slog.GroupValue(buildAttrs(v)...)})
+		case appended:
+			anys := make([]any, 0, len(v))
+			for _, sliceVal := range v {
+				switch sliceV := sliceVal.(type) {
+				case slog.Attr:
+					anys = append(anys, sliceV.Value.Any())
+				case *b.Tree[string, any]:
+					// Convert subtree into a map (because having a Group Attribute within a slice doesn't render)
+					anys = append(anys, buildGroupMap(buildAttrs(sliceV)))
+				default:
+					panic("unexpected type in attribute map")
+				}
+			}
+			attrs = append(attrs, slog.Any(k, anys))
 		default:
 			panic("unexpected type in attribute map")
 		}
 	}
 	return attrs
+}
+
+// buildGroupMap takes a slice of attributes (the attributes within a group), and turns them into a map of string keys
+// to a non-attribute resolved value (any).
+// This function exists solely to deal with groups that are inside appended-slices,
+// because slog does not have a "slice" kind, which means that those groups and their values do not render at all.
+func buildGroupMap(attrs []slog.Attr) map[string]any {
+	group := map[string]any{}
+	for _, attr := range attrs {
+		if attr.Value.Kind() != slog.KindGroup {
+			group[attr.Key] = attr.Value.Any()
+		} else {
+			group[attr.Key] = buildGroupMap(attr.Value.Group())
+		}
+	}
+	return group
 }
 
 // groupOrAttrs holds either a group name or a list of slog.Attrs.
