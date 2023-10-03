@@ -1,4 +1,13 @@
 # slog-dedup
+[![tag](https://img.shields.io/github/tag/veqryn/slog-dedup.svg)](https://github.com/veqryn/slog-dedup/releases)
+![Go Version](https://img.shields.io/badge/Go-%3E%3D%201.21-%23007d9c)
+[![GoDoc](https://godoc.org/github.com/veqryn/slog-dedup?status.svg)](https://pkg.go.dev/github.com/veqryn/slog-dedup)
+![Build Status](https://github.com/veqryn/slog-dedup/actions/workflows/build_and_test.yml/badge.svg)
+[![Go report](https://goreportcard.com/badge/github.com/veqryn/slog-dedup)](https://goreportcard.com/report/github.com/veqryn/slog-dedup)
+[![Coverage](https://img.shields.io/codecov/c/github/veqryn/slog-dedup)](https://codecov.io/gh/veqryn/slog-dedup)
+[![Contributors](https://img.shields.io/github/contributors/veqryn/slog-dedup)](https://github.com/veqryn/slog-dedup/graphs/contributors)
+[![License](https://img.shields.io/github/license/veqryn/slog-dedup)](./LICENSE)
+
 Golang structured logging (slog) deduplication for use with json logging (or any other format where duplicates are not appreciated).
 
 The slog handlers in this module are "middleware" handlers. When creating them, you must pass in another handler, which will be called after this handler has finished handling a log record. Because of this, these handlers can be chained with other middlewares, and can be used with many different final handlers, whether from the stdlib or third-party, such as json, protobuf, text, or data sinks.
@@ -7,6 +16,7 @@ The main impetus behind this package is because most JSON tools do not like dupl
 
 Unfortunately the default behavior of the stdlib slog handlers is to allow duplicate keys:
 ```go
+// This make json tools unhappy    :(
 slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, nil)))
 slog.Info("this is the stdlib json handler by itself",
     slog.String("duplicated", "zero"),
@@ -27,6 +37,10 @@ Outputs:
 ```
 With this in mind, this repo was created with several different ways of deduplicating the keys.
 
+## Install
+`go get github.com/veqryn/slog-dedup`
+
+## Usage
 ### Overwrite Older Duplicates Handler
 ```go
 logger := slog.New(dedup.NewOverwriteHandler(slog.NewJSONHandler(os.Stdout, nil), nil))

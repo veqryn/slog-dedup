@@ -1,6 +1,7 @@
 package dedup
 
 import (
+	"log/slog"
 	"strings"
 	"testing"
 )
@@ -109,4 +110,41 @@ func TestAppendHandler(t *testing.T) {
 	// t.Error(tester.String())
 
 	checkRecordForDuplicates(t, tester.Record)
+}
+
+/*
+	{
+	  "time": "2023-09-29T13:00:59Z",
+	  "level": "INFO",
+	  "msg": "case insenstive, keep builtin conflict",
+	  "arg1": ["val1","val2"],
+	  "msg":"builtin-conflict"
+	}
+*/
+func TestAppendHandler_CaseInsensitiveKeepIfBuiltinConflict(t *testing.T) {
+	t.Parallel()
+
+	tester := &testHandler{}
+	h := NewAppendHandler(tester, &AppendHandlerOptions{
+		KeyCompare:                CaseInsensitiveCmp,
+		ResolveBuiltinKeyConflict: KeepIfBuiltinKeyConflict,
+	})
+
+	log := slog.New(h)
+	log.Info("case insenstive, keep builtin conflict", "arg1", "val1", "ARG1", "val2", slog.MessageKey, "builtin-conflict")
+
+	jBytes, err := tester.MarshalJSON()
+	if err != nil {
+		t.Errorf("Unable to marshal json: %v", err)
+	}
+	jStr := strings.TrimSpace(string(jBytes))
+
+	expected := `{"time":"2023-09-29T13:00:59Z","level":"INFO","msg":"case insenstive, keep builtin conflict","arg1":["val1","val2"],"msg":"builtin-conflict"}`
+	if jStr != expected {
+		t.Errorf("Expected:\n%s\nGot:\n%s", expected, jStr)
+	}
+
+	// Uncomment to see the results
+	// t.Error(jStr)
+	// t.Error(tester.String())
 }
