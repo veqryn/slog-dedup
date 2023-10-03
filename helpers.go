@@ -89,7 +89,7 @@ func CaseInsensitiveCmp(a, b string) int {
 }
 
 // appended is a type that exists to allow us to differentiate between a log attribute that is a slice or any's ([]any),
-// versus when we are appending to the key so that it becomes a slice.
+// versus when we are appending to the key so that it becomes a slice. Only used with the AppendHandler.
 type appended []any
 
 // buildAttrs converts the deduplicated map back into an attribute array,
@@ -112,6 +112,7 @@ func buildAttrs(uniq *b.Tree[string, any]) []slog.Attr {
 			// Convert subtree into a group
 			attrs = append(attrs, slog.Attr{Key: k, Value: slog.GroupValue(buildAttrs(v)...)})
 		case appended:
+			// This case only happens in the AppendHandler
 			anys := make([]any, 0, len(v))
 			for _, sliceVal := range v {
 				switch sliceV := sliceVal.(type) {
@@ -134,7 +135,7 @@ func buildAttrs(uniq *b.Tree[string, any]) []slog.Attr {
 
 // buildGroupMap takes a slice of attributes (the attributes within a group), and turns them into a map of string keys
 // to a non-attribute resolved value (any).
-// This function exists solely to deal with groups that are inside appended-slices,
+// This function exists solely to deal with groups that are inside appended-slices (for the AppendHandler),
 // because slog does not have a "slice" kind, which means that those groups and their values do not render at all.
 func buildGroupMap(attrs []slog.Attr) map[string]any {
 	group := map[string]any{}
