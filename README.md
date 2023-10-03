@@ -16,7 +16,7 @@ The main impetus behind this package is because most JSON tools do not like dupl
 
 Unfortunately the default behavior of the stdlib slog handlers is to allow duplicate keys:
 ```go
-// This make json tools unhappy    :(
+// This makes json tools unhappy    :(
 slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, nil)))
 slog.Info("this is the stdlib json handler by itself",
     slog.String("duplicated", "zero"),
