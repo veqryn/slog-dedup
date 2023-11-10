@@ -1,5 +1,5 @@
 /*
-Package dedup provides structured logging (slog) deduplication for use with json logging
+Package slogdedup provides structured logging (slog) deduplication for use with json logging
 (or any other format where duplicates are not appreciated).
 The main impetus behind this package is because most JSON tools do not like duplicate keys for their member
 properties/fields. Some of them will give errors or fail to parse the log line, and some may even crash.
@@ -8,7 +8,7 @@ Unfortunately the default behavior of the stdlib slog handlers is to allow dupli
 Usage:
 
 	// OverwriteHandler
-	overwriter := dedup.NewOverwriteHandler(slog.NewJSONHandler(os.Stdout, nil), nil)
+	overwriter := slogdedup.NewOverwriteHandler(slog.NewJSONHandler(os.Stdout, nil), nil)
 	slog.SetDefault(slog.New(overwriter))
 
 	// {
@@ -24,7 +24,7 @@ Usage:
 	)
 
 	// IgnoreHandler
-	ignorer := dedup.NewIgnoreHandler(slog.NewJSONHandler(os.Stdout, nil), nil)
+	ignorer := slogdedup.NewIgnoreHandler(slog.NewJSONHandler(os.Stdout, nil), nil)
 	slog.SetDefault(slog.New(ignorer))
 
 	// {
@@ -40,7 +40,7 @@ Usage:
 	)
 
 	// IncrementHandler
-	incrementer := dedup.NewIncrementHandler(slog.NewJSONHandler(os.Stdout, nil), nil)
+	incrementer := slogdedup.NewIncrementHandler(slog.NewJSONHandler(os.Stdout, nil), nil)
 	slog.SetDefault(slog.New(incrementer))
 
 	// {
@@ -58,7 +58,7 @@ Usage:
 	)
 
 	// AppendHandler
-	appender := dedup.NewAppendHandler(slog.NewJSONHandler(os.Stdout, nil), nil)
+	appender := slogdedup.NewAppendHandler(slog.NewJSONHandler(os.Stdout, nil), nil)
 	slog.SetDefault(slog.New(appender))
 
 	// {
@@ -77,4 +77,4 @@ Usage:
 		slog.String("duplicated", "two"),
 	)
 */
-package dedup
+package slogdedup

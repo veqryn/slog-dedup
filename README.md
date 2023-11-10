@@ -40,10 +40,16 @@ With this in mind, this repo was created with several different ways of deduplic
 ## Install
 `go get github.com/veqryn/slog-dedup`
 
+```go
+import (
+	slogdedup "github.com/veqryn/slog-dedup"
+)
+```
+
 ## Usage
 ### Overwrite Older Duplicates Handler
 ```go
-logger := slog.New(dedup.NewOverwriteHandler(slog.NewJSONHandler(os.Stdout, nil), nil))
+logger := slog.New(slogdedup.NewOverwriteHandler(slog.NewJSONHandler(os.Stdout, nil), nil))
 logger.Info("this is the dedup overwrite handler",
     slog.String("duplicated", "zero"),
     slog.String("duplicated", "one"),
@@ -62,7 +68,7 @@ Outputs:
 
 ### Ignore Newer Duplicates Handler
 ```go
-logger := slog.New(dedup.NewIgnoreHandler(slog.NewJSONHandler(os.Stdout, nil), nil))
+logger := slog.New(slogdedup.NewIgnoreHandler(slog.NewJSONHandler(os.Stdout, nil), nil))
 logger.Info("this is the dedup ignore handler",
     slog.String("duplicated", "zero"),
     slog.String("duplicated", "one"),
@@ -81,7 +87,7 @@ Outputs:
 
 ### Increment Newer Duplicate Key Names Handler
 ```go
-logger := slog.New(dedup.NewIncrementHandler(slog.NewJSONHandler(os.Stdout, nil), nil))
+logger := slog.New(slogdedup.NewIncrementHandler(slog.NewJSONHandler(os.Stdout, nil), nil))
 logger.Info("this is the dedup incrementer handler",
     slog.String("duplicated", "zero"),
     slog.String("duplicated", "one"),
@@ -102,7 +108,7 @@ Outputs:
 
 ### Append Duplicates Together in an Array Handler
 ```go
-logger := slog.New(dedup.NewAppendHandler(slog.NewJSONHandler(os.Stdout, nil), nil))
+logger := slog.New(slogdedup.NewAppendHandler(slog.NewJSONHandler(os.Stdout, nil), nil))
 logger.Info("this is the dedup appender handler",
     slog.String("duplicated", "zero"),
     slog.String("duplicated", "one"),
@@ -131,12 +137,12 @@ import (
 	"log/slog"
 	"os"
 
-	dedup "github.com/veqryn/slog-dedup"
+	slogdedup "github.com/veqryn/slog-dedup"
 )
 
 func main() {
 	// OverwriteHandler
-	overwriter := dedup.NewOverwriteHandler(slog.NewJSONHandler(os.Stdout, nil), nil)
+	overwriter := slogdedup.NewOverwriteHandler(slog.NewJSONHandler(os.Stdout, nil), nil)
 	slog.SetDefault(slog.New(overwriter))
 
 	/*
@@ -154,7 +160,7 @@ func main() {
 	)
 
 	// IgnoreHandler
-	ignorer := dedup.NewIgnoreHandler(slog.NewJSONHandler(os.Stdout, nil), nil)
+	ignorer := slogdedup.NewIgnoreHandler(slog.NewJSONHandler(os.Stdout, nil), nil)
 	slog.SetDefault(slog.New(ignorer))
 
 	/*
@@ -172,7 +178,7 @@ func main() {
 	)
 
 	// IncrementHandler
-	incrementer := dedup.NewIncrementHandler(slog.NewJSONHandler(os.Stdout, nil), nil)
+	incrementer := slogdedup.NewIncrementHandler(slog.NewJSONHandler(os.Stdout, nil), nil)
 	slog.SetDefault(slog.New(incrementer))
 
 	/*
@@ -192,7 +198,7 @@ func main() {
 	)
 
 	// AppendHandler
-	appender := dedup.NewAppendHandler(slog.NewJSONHandler(os.Stdout, nil), nil)
+	appender := slogdedup.NewAppendHandler(slog.NewJSONHandler(os.Stdout, nil), nil)
 	slog.SetDefault(slog.New(appender))
 
 	/*
@@ -214,6 +220,21 @@ func main() {
 	)
 }
 ```
+
+## Breaking Changes
+### O.1.0 -> 0.2.0
+Package renamed from `dedup` to `slogdedup`.
+To fix, change this:
+```go
+import "github.com/veqryn/slog-dedup"
+var overwriter = dedup.NewOverwriteHandler(slog.NewJSONHandler(os.Stdout, nil), nil)
+```
+To this:
+```go
+import "github.com/veqryn/slog-dedup"
+var overwriter = slogdedup.NewOverwriteHandler(slog.NewJSONHandler(os.Stdout, nil), nil)
+```
+Named imports are unaffected.
 
 ## Other Details
 ### Overwrite Handler
