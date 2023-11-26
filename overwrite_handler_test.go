@@ -88,10 +88,10 @@ func TestOverwriteHandler_CaseInsensitiveDropBuiltinConflicts(t *testing.T) {
 	t.Parallel()
 
 	tester := &testHandler{}
-	h := NewOverwriteHandler(tester, &OverwriteHandlerOptions{
+	h := NewOverwriteMiddleware(&OverwriteHandlerOptions{
 		KeyCompare:                CaseInsensitiveCmp,
 		ResolveBuiltinKeyConflict: DropIfBuiltinKeyConflict,
-	})
+	})(tester)
 
 	log := slog.New(h)
 	log.Info("case insenstive, drop builtin conflict", "arg1", "val1", "ARG1", "val2", slog.MessageKey, "builtin-conflict")

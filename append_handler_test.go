@@ -125,10 +125,10 @@ func TestAppendHandler_CaseInsensitiveKeepIfBuiltinConflict(t *testing.T) {
 	t.Parallel()
 
 	tester := &testHandler{}
-	h := NewAppendHandler(tester, &AppendHandlerOptions{
+	h := NewAppendMiddleware(&AppendHandlerOptions{
 		KeyCompare:                CaseInsensitiveCmp,
 		ResolveBuiltinKeyConflict: KeepIfBuiltinKeyConflict,
-	})
+	})(tester)
 
 	log := slog.New(h)
 	log.Info("case insenstive, keep builtin conflict", "arg1", "val1", "ARG1", "val2", slog.MessageKey, "builtin-conflict")
