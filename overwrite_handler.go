@@ -30,7 +30,25 @@ type OverwriteHandler struct {
 
 var _ slog.Handler = &OverwriteHandler{} // Assert conformance with interface
 
-// NewOverwriteHandler creates a OverwriteHandler slog.Handler middleware that will deduplicate all attributes and
+// NewOverwriteMiddleware creates an OverwriteHandler slog.Handler middleware
+// that conforms to [github.com/samber/slog-multi.Middleware] interface.
+// It can be used with slogmulti methods such as Pipe to easily setup a pipeline of slog handlers:
+//
+//	slog.SetDefault(slog.New(slogmulti.
+//		Pipe(slogcontext.NewMiddleware(&slogcontext.HandlerOptions{})).
+//		Pipe(slogdedup.NewOverwriteMiddleware(&slogdedup.OverwriteHandlerOptions{})).
+//		Handler(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{})),
+//	))
+func NewOverwriteMiddleware(options *OverwriteHandlerOptions) func(slog.Handler) slog.Handler {
+	return func(next slog.Handler) slog.Handler {
+		return NewOverwriteHandler(
+			next,
+			options,
+		)
+	}
+}
+
+// NewOverwriteHandler creates an OverwriteHandler slog.Handler middleware that will deduplicate all attributes and
 // groups by overwriting any older attributes or groups with the same string key.
 // It passes the final record and attributes off to the next handler when finished.
 // If opts is nil, the default options are used.

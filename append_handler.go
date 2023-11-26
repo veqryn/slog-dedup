@@ -30,6 +30,24 @@ type AppendHandler struct {
 
 var _ slog.Handler = &AppendHandler{} // Assert conformance with interface
 
+// NewAppendMiddleware creates an AppendHandler slog.Handler middleware
+// that conforms to [github.com/samber/slog-multi.Middleware] interface.
+// It can be used with slogmulti methods such as Pipe to easily setup a pipeline of slog handlers:
+//
+//	slog.SetDefault(slog.New(slogmulti.
+//		Pipe(slogcontext.NewMiddleware(&slogcontext.HandlerOptions{})).
+//		Pipe(slogdedup.NewAppendMiddleware(&slogdedup.AppendHandlerOptions{})).
+//		Handler(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{})),
+//	))
+func NewAppendMiddleware(options *AppendHandlerOptions) func(slog.Handler) slog.Handler {
+	return func(next slog.Handler) slog.Handler {
+		return NewAppendHandler(
+			next,
+			options,
+		)
+	}
+}
+
 // NewAppendHandler creates a AppendHandler slog.Handler middleware that will deduplicate all attributes and
 // groups by creating a slice/array whenever there is more than one attribute with the same key.
 // It passes the final record and attributes off to the next handler when finished.
@@ -110,7 +128,7 @@ func (h *AppendHandler) createAttrTree(uniq *b.Tree[string, any], goas []*groupO
 
 	// If a group is encountered, create a subtree for that group and all groupOrAttrs after it
 	if goas[0].group != "" {
-		if key, ok := h.getKey(goas[0].group, depth); ok {
+		if key, keep := h.getKey(goas[0].group, depth); keep {
 			uniqGroup := b.TreeNew[string, any](h.keyCompare)
 			h.createAttrTree(uniqGroup, goas[1:], depth+1)
 			// Ignore empty groups, otherwise put subtree into the map
@@ -142,7 +160,7 @@ func (h *AppendHandler) createAttrTree(uniq *b.Tree[string, any], goas []*groupO
 // Since attributes are ordered from oldest to newest, it creates a slice whenever it detects the key already exists,
 // appending the new attribute, then overwriting the key with that slice.
 func (h *AppendHandler) resolveValues(uniq *b.Tree[string, any], attrs []slog.Attr, depth int) {
-	var ok bool
+	var keep bool
 	for _, a := range attrs {
 		a.Value = a.Value.Resolve()
 		if a.Equal(slog.Attr{}) {
@@ -150,8 +168,8 @@ func (h *AppendHandler) resolveValues(uniq *b.Tree[string, any], attrs []slog.At
 		}
 
 		// Default situation: resolve the key and put it into the map
-		a.Key, ok = h.getKey(a.Key, depth)
-		if !ok {
+		a.Key, keep = h.getKey(a.Key, depth)
+		if !keep {
 			continue
 		}
 

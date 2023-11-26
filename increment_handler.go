@@ -32,6 +32,24 @@ type IncrementHandler struct {
 
 var _ slog.Handler = &IncrementHandler{} // Assert conformance with interface
 
+// NewIncrementMiddleware creates an IncrementHandler slog.Handler middleware
+// that conforms to [github.com/samber/slog-multi.Middleware] interface.
+// It can be used with slogmulti methods such as Pipe to easily setup a pipeline of slog handlers:
+//
+//	slog.SetDefault(slog.New(slogmulti.
+//		Pipe(slogcontext.NewMiddleware(&slogcontext.HandlerOptions{})).
+//		Pipe(slogdedup.NewIncrementMiddleware(&slogdedup.IncrementHandlerOptions{})).
+//		Handler(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{})),
+//	))
+func NewIncrementMiddleware(options *IncrementHandlerOptions) func(slog.Handler) slog.Handler {
+	return func(next slog.Handler) slog.Handler {
+		return NewIncrementHandler(
+			next,
+			options,
+		)
+	}
+}
+
 // NewIncrementHandler creates a IncrementHandler slog.Handler middleware that will deduplicate all attributes and
 // groups by incrementing/modifying their key names.
 // It passes the final record and attributes off to the next handler when finished.

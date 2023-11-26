@@ -237,6 +237,17 @@ var overwriter = slogdedup.NewOverwriteHandler(slog.NewJSONHandler(os.Stdout, ni
 Named imports are unaffected.
 
 ## Other Details
+### slog-multi Middleware
+This library has convenience methods that allow it to interoperate with [github.com/samber/slog-multi](https://github.com/samber/slog-multi),
+in order to easily setup slog workflows such as pipelines, fanout, routing, failover, etc.
+```go
+slog.SetDefault(slog.New(slogmulti.
+	Pipe(slogcontext.NewMiddleware(&slogcontext.HandlerOptions{})).
+	Pipe(slogdedup.NewOverwriteMiddleware(&slogdedup.OverwriteHandlerOptions{})).
+	Handler(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{})),
+))
+```
+
 ### Overwrite Handler
 Using an overwrite handler allows a slightly different style of logging that is less verbose. As an application moves deeper into domain functions, it is common that additional details or knowledge is uncovered. By overwriting keys with better and more explanatory values as you go, the final log lines are often easier to read and more informative.
 

@@ -30,6 +30,24 @@ type IgnoreHandler struct {
 
 var _ slog.Handler = &IgnoreHandler{} // Assert conformance with interface
 
+// NewIgnoreMiddleware creates an IgnoreHandler slog.Handler middleware
+// that conforms to [github.com/samber/slog-multi.Middleware] interface.
+// It can be used with slogmulti methods such as Pipe to easily setup a pipeline of slog handlers:
+//
+//	slog.SetDefault(slog.New(slogmulti.
+//		Pipe(slogcontext.NewMiddleware(&slogcontext.HandlerOptions{})).
+//		Pipe(slogdedup.NewIgnoreMiddleware(&slogdedup.IgnoreHandlerOptions{})).
+//		Handler(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{})),
+//	))
+func NewIgnoreMiddleware(options *IgnoreHandlerOptions) func(slog.Handler) slog.Handler {
+	return func(next slog.Handler) slog.Handler {
+		return NewIgnoreHandler(
+			next,
+			options,
+		)
+	}
+}
+
 // NewIgnoreHandler creates a IgnoreHandler slog.Handler middleware that will deduplicate all attributes and
 // groups by ignoring any newer attributes or groups with the same string key as an older attribute.
 // It passes the final record and attributes off to the next handler when finished.

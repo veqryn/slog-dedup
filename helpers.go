@@ -95,8 +95,8 @@ type appended []any
 // buildAttrs converts the deduplicated map back into an attribute array,
 // with any subtrees converted into slog.Group's
 func buildAttrs(uniq *b.Tree[string, any]) []slog.Attr {
-	en, err := uniq.SeekFirst()
-	if err != nil {
+	en, emptyErr := uniq.SeekFirst()
+	if emptyErr != nil {
 		return nil // Empty (btree only returns an error when empty)
 	}
 	defer en.Close()
