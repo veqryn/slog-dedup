@@ -7,6 +7,7 @@ on:
   push:
     tags:
     branches:
+      - main
   pull_request:
     branches:
 
@@ -19,31 +20,31 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        go-version: [ '1.21' ]
+        go-version: [ '1.21', '1.22' ]
 
     steps:
-    - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-    - name: Set up Go ${{ matrix.go-version }}
-      uses: actions/setup-go@v4
-      with:
-        go-version: ${{ matrix.go-version }}
+      - name: Set up Go ${{ matrix.go-version }}
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ matrix.go-version }}
 
-    - name: Display Go version
-      run: go version
+      - name: Display Go version ${{ matrix.go-version }}
+        run: go version
 
-    - name: Install dependencies
-      run: |
-        go mod download
-        go get -t -u golang.org/x/tools/cmd/cover
+      - name: Install dependencies ${{ matrix.go-version }}
+        run: |
+          go get -t -u golang.org/x/tools/cmd/cover
+          go mod download
 
-    - name: Build
-      run: go build -v ./...
+      - name: Build ${{ matrix.go-version }}
+        run: go build -v ./...
 
-    - name: Test
-      run: go test -v -race -coverprofile=coverage.out -covermode=atomic
+      - name: Test ${{ matrix.go-version }}
+        run: go test -v -race -coverprofile=coverage.out -covermode=atomic
 
-    - name: Upload coverage reports to Codecov
-      uses: codecov/codecov-action@v3
-      env:
-        CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+      - name: Upload coverage reports to Codecov ${{ matrix.go-version }}
+        uses: codecov/codecov-action@v3
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
