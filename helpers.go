@@ -8,56 +8,45 @@ import (
 	"modernc.org/b/v2"
 )
 
-// TODO: also create a sorting middleware as well
-// TODO: also create a pretty json printer that still prints to only 1 line, just prettier
-
-// getKeyClosure returns a function to be used to resolve a key at the root level, determining its behavior when it
-// would otherwise conflict/duplicate the 4 built-in attribute keys (time, level, msg, source).
-func getKeyClosure(resolveBuiltinKeyConflict func(k string) (string, bool)) func(key string, depth int) (string, bool) {
-	return func(key string, depth int) (string, bool) {
-		if depth == 0 {
-			return resolveBuiltinKeyConflict(key)
-		}
-		return key, true
+// IncrementIfBuiltinKeyConflict is a ResolveKey function that will, if there is
+// a conflict/duplication at the root level (not in a group) with one of the
+// built-in keys, add "#01" to the end of the key.
+func IncrementIfBuiltinKeyConflict(groups []string, key string, index int) (string, bool) {
+	if len(groups) == 0 && doesBuiltinKeyConflict(key) {
+		return incrementKeyName(key, index+1), true // Don't overwrite the built-in attribute keys
 	}
+	return incrementKeyName(key, index), true
 }
 
-// IncrementIfBuiltinKeyConflict will, if there is a conflict/duplication at the root level (not in a group) with one of
-// the built-in keys, add "#01" to the end of the key
-func IncrementIfBuiltinKeyConflict(key string) (string, bool) {
-	if DoesBuiltinKeyConflict(key) {
-		return IncrementKeyName(key, 1), true // Don't overwrite the built-in attribute keys
-	}
-	return key, true
-}
-
-// DropIfBuiltinKeyConflict will, if there is a conflict/duplication at the root level (not in a group) with one of the
+// DropIfBuiltinKeyConflict is a ResolveKey function that will, if there is a
+// conflict/duplication at the root level (not in a group) with one of the
 // built-in keys, drop the whole attribute
-func DropIfBuiltinKeyConflict(key string) (string, bool) {
-	if DoesBuiltinKeyConflict(key) {
+func DropIfBuiltinKeyConflict(groups []string, key string, index int) (string, bool) {
+	if len(groups) == 0 && doesBuiltinKeyConflict(key) {
 		return "", false // Drop the attribute
 	}
-	return key, true
+	return incrementKeyName(key, index), true
 }
 
-// KeepIfBuiltinKeyConflict will keep all keys even if there would be a conflict/duplication at the root level (not in a
+// KeepIfBuiltinKeyConflict is a ResolveKey function that will keep all keys
+// even if there would be a conflict/duplication at the root level (not in a
 // group) with one of the built-in keys
-func KeepIfBuiltinKeyConflict(key string) (string, bool) {
-	return key, true // Keep all
+func KeepIfBuiltinKeyConflict(_ []string, key string, index int) (string, bool) {
+	return incrementKeyName(key, index), true // Keep all
 }
 
-// DoesBuiltinKeyConflict returns true if the key conflicts with the builtin keys.
+// doesBuiltinKeyConflict returns true if the key conflicts with the builtin keys.
 // This will only be called on all root level (not in a group) attribute keys.
-func DoesBuiltinKeyConflict(key string) bool {
+func doesBuiltinKeyConflict(key string) bool {
 	if key == slog.TimeKey || key == slog.LevelKey || key == slog.MessageKey || key == slog.SourceKey {
 		return true
 	}
 	return false
 }
 
-// IncrementKeyName adds a count onto the key name after the first seen.
+// incrementKeyName adds a count onto the key name after the first seen.
 // Example: keyname, keyname#01, keyname#02, keyname#03
-func IncrementKeyName(key string, index int) string {
+func incrementKeyName(key string, index int) string {
 	if index == 0 {
 		return key
 	}
