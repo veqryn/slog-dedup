@@ -76,6 +76,83 @@ var sinkGraylog = sink{
 }
 
 
+// ResolveKeyStackdriver returns a ResolveKey function works for Stackdriver
+// (aka Google Cloud Operations, aka GCP Log Explorer).
+func ResolveKeyStackdriver() func(groups []string, key string, index int) (string, bool) {
+	return resolveKeys(sinkStackdriver)
+}
+
+// ReplaceAttrStackdriver returns a ReplaceAttr function works for Stackdriver
+// (aka Google Cloud Operations, aka GCP Log Explorer).
+func ReplaceAttrStackdriver() func(groups []string, a slog.Attr) slog.Attr {
+	return replaceAttr(sinkStackdriver)
+}
+
+// Stackdriver, aka Google Cloud Operations, aka GCP Log Explorer
+// https://cloud.google.com/products/operations
+var sinkStackdriver = sink{
+	builtins: []string{slog.TimeKey, "severity", "message", "logging.googleapis.com/sourceLocation"},
+	replacers: map[string]attrReplacer{
+		// The default slog time key is "time", which stackdriver will detect and parse:
+		// https://cloud.google.com/logging/docs/agent/logging/configuration#special-fields
+
+		// "severity" is what Stackdriver uses for the log level:
+		// https://cloud.google.com/logging/docs/reference/v2/rest/v2/LogEntry#LogSeverity
+		// Have the builtin level use this as its key.
+		slog.LevelKey: {key: "severity", valuer: func(v slog.Value) slog.Value {
+			switch lvl := v.Any().(type) {
+			case slog.Level:
+				if lvl <= slog.LevelDebug {
+					return slog.StringValue("DEBUG")
+				} else if lvl <= slog.LevelInfo {
+					return slog.StringValue("INFO")
+				} else if lvl < slog.LevelWarn {
+					return slog.StringValue("NOTICE")
+				} else if lvl == slog.LevelWarn {
+					return slog.StringValue("WARNING")
+				} else if lvl <= slog.LevelError {
+					return slog.StringValue("ERROR")
+				} else if lvl <= slog.LevelError+4 {
+					return slog.StringValue("CRITICAL")
+				} else if lvl <= slog.LevelError+8 {
+					return slog.StringValue("ALERT")
+				}
+				return slog.StringValue("EMERGENCY")
+			default:
+				return v
+			}
+		}},
+
+		// "message" is what Stackdriver will show when skimming. It defaults to the entire log payload.
+		// Have the builtin message use this as its key.
+		slog.MessageKey: {key: "message"},
+
+		// "logging.googleapis.com/sourceLocation" is what Stackdriver expects for
+		// the key containing the file, line, and function values.
+		// Have the builtin source use this as its key.
+		slog.SourceKey: {key: "logging.googleapis.com/sourceLocation", valuer: func(v slog.Value) slog.Value {
+			// https://cloud.google.com/logging/docs/reference/v2/rest/v2/LogEntry#LogEntrySourceLocation
+			switch source := v.Any().(type) {
+			case *slog.Source:
+				if source == nil {
+					return v
+				}
+				return slog.AnyValue(struct {
+					Function string `json:"function"`
+					File     string `json:"file"`
+					Line     string `json:"line"` // slog.Source.Line is an int, GCP wants a string
+				}{
+					Function: source.Function,
+					File:     source.File,
+					Line:     strconv.Itoa(source.Line),
+				})
+			default:
+				fmt.Printf("SOURCE: %T: %#+v\n", source, source)
+				return v
+			}
+		}},
+	},
+}
 
 // sink represents the final destination of the logs.
 type sink struct {
