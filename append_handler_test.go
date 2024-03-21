@@ -8,82 +8,90 @@ import (
 
 /*
 	{
-	    "time": "2023-09-29T13:00:59Z",
-	    "level": "INFO",
-	    "msg": "main message",
-	    "arg1": [
-	        "with1arg1",
-	        "with2arg1"
-	    ],
-	    "arg2": "with1arg2",
-	    "arg3": [
-	        "with1arg3",
-	        "with2arg3"
-	    ],
-	    "arg4": "with2arg4",
-	    "group1": [
-	        "with2group1",
-	        {
-	            "arg1": [
-	                "group1with3arg1",
-	                "group1with4arg1",
-	                "main1arg1"
-	            ],
-	            "arg2": "group1with3arg2",
-	            "arg3": [
-	                "group1with3arg3",
-	                "group1with4arg3"
-	            ],
-	            "arg4": "group1with4arg4",
-	            "arg5": "with4inlinedGroupArg5",
-	            "arg6": "main1arg6",
-	            "level": [
-	                "with4overwritten",
-	                "main1overwritten",
-	                "main1level"
-	            ],
-	            "main1": "arg0",
-	            "main1group3": {
-	                "group3": [
-	                    "group3overwritten",
-	                    "group3arg0"
-	                ]
-	            },
-	            "msg": "with4msg",
-	            "overwrittenGroup": [
-	                {
-	                    "arg": "arg"
-	                },
-	                "with4overwrittenGroup"
-	            ],
-	            "separateGroup2": {
-	                "arg1": "group2arg1",
-	                "arg2": "group2arg2",
-	                "group2": "group2arg0"
-	            },
-	            "source": "with3source",
-	            "time": "with3time",
-	            "with3": "arg0",
-	            "with4": "arg0"
-	        }
-	    ],
-	    "level#01": "with2level",
-	    "msg#01": [
-	        "prexisting01",
-	        "with2msg",
-	        "with2msg2"
-	    ],
-	    "msg#01a": "seekbug01a",
-	    "msg#02": "seekbug02",
-	    "source#01": "with1source",
-	    "time#01": "with1time",
-	    "typed": [
-	        "overwritten",
-	        3,
-	        true
-	    ],
-	    "with1": "arg0",
-	    "with2": "arg0"
+		"time": "2023-09-29T13:00:59Z",
+		"level": "INFO",
+		"msg": "main message",
+		"arg1": [
+			"with1arg1",
+			"with2arg1"
+		],
+		"arg2": "with1arg2",
+		"arg3": [
+			"with1arg3",
+			"with2arg3"
+		],
+		"arg4": "with2arg4",
+		"group1": [
+			"with2group1",
+			{
+				"arg1": [
+					"group1with3arg1",
+					"group1with4arg1",
+					"main1arg1"
+				],
+				"arg2": "group1with3arg2",
+				"arg3": [
+					"group1with3arg3",
+					"group1with4arg3"
+				],
+				"arg4": "group1with4arg4",
+				"arg5": "with4inlinedGroupArg5",
+				"arg6": "main1arg6",
+				"level": [
+					"with4overwritten",
+					"main1overwritten",
+					"main1level"
+				],
+				"main1": "arg0",
+				"main1group3": {
+					"group3": [
+						"group3overwritten",
+						"group3arg0"
+					]
+				},
+				"msg": "with4msg",
+				"overwrittenGroup": [
+					{
+						"arg": "arg"
+					},
+					"with4overwrittenGroup"
+				],
+				"separateGroup2": {
+					"arg1": "group2arg1",
+					"arg2": "group2arg2",
+					"group2": "group2arg0"
+				},
+				"source": "with3source",
+				"time": "with3time",
+				"with3": "arg0",
+				"with4": "arg0"
+			}
+		],
+		"level#01": [
+			"with2level",
+			{
+				"levelGroupKey": "levelGroupValue"
+			},
+			{
+				"inlinedLevelGroupKey": "inlinedLevelGroupValue"
+			}
+		],
+		"msg#01": [
+			"prexisting01",
+			"with2msg",
+			"with2msg2"
+		],
+		"msg#01a": "seekbug01a",
+		"msg#02": "seekbug02",
+		"source#01": "with1source",
+		"time#01": "with1time",
+		"typed": [
+			"overwritten",
+			3,
+			true
+		],
+		"with1": "arg0",
+		"with2": "arg0"
 	}
 */
 func TestAppendHandler(t *testing.T) {
@@ -100,7 +108,7 @@ func TestAppendHandler(t *testing.T) {
 	}
 	jStr := strings.TrimSpace(string(jBytes))
 
-	expected := `{"time":"2023-09-29T13:00:59Z","level":"INFO","msg":"main message","arg1":["with1arg1","with2arg1"],"arg2":"with1arg2","arg3":["with1arg3","with2arg3"],"arg4":"with2arg4","group1":["with2group1",{"arg1":["group1with3arg1","group1with4arg1","main1arg1"],"arg2":"group1with3arg2","arg3":["group1with3arg3","group1with4arg3"],"arg4":"group1with4arg4","arg5":"with4inlinedGroupArg5","arg6":"main1arg6","level":["with4overwritten","main1overwritten","main1level"],"main1":"arg0","main1group3":{"group3":["group3overwritten","group3arg0"]},"msg":"with4msg","overwrittenGroup":[{"arg":"arg"},"with4overwrittenGroup"],"separateGroup2":{"arg1":"group2arg1","arg2":"group2arg2","group2":"group2arg0"},"source":"with3source","time":"with3time","with3":"arg0","with4":"arg0"}],"level#01":"with2level","msg#01":["prexisting01","with2msg","with2msg2"],"msg#01a":"seekbug01a","msg#02":"seekbug02","source#01":"with1source","time#01":"with1time","typed":["overwritten",3,true],"with1":"arg0","with2":"arg0"}`
+	expected := `{"time":"2023-09-29T13:00:59Z","level":"INFO","msg":"main message","arg1":["with1arg1","with2arg1"],"arg2":"with1arg2","arg3":["with1arg3","with2arg3"],"arg4":"with2arg4","group1":["with2group1",{"arg1":["group1with3arg1","group1with4arg1","main1arg1"],"arg2":"group1with3arg2","arg3":["group1with3arg3","group1with4arg3"],"arg4":"group1with4arg4","arg5":"with4inlinedGroupArg5","arg6":"main1arg6","level":["with4overwritten","main1overwritten","main1level"],"main1":"arg0","main1group3":{"group3":["group3overwritten","group3arg0"]},"msg":"with4msg","overwrittenGroup":[{"arg":"arg"},"with4overwrittenGroup"],"separateGroup2":{"arg1":"group2arg1","arg2":"group2arg2","group2":"group2arg0"},"source":"with3source","time":"with3time","with3":"arg0","with4":"arg0"}],"level#01":["with2level",{"levelGroupKey":"levelGroupValue"},{"inlinedLevelGroupKey":"inlinedLevelGroupValue"}],"msg#01":["prexisting01","with2msg","with2msg2"],"msg#01a":"seekbug01a","msg#02":"seekbug02","source#01":"with1source","time#01":"with1time","typed":["overwritten",3,true],"with1":"arg0","with2":"arg0"}`
 	if jStr != expected {
 		t.Errorf("Expected:\n%s\nGot:\n%s", expected, jStr)
 	}
@@ -126,8 +134,8 @@ func TestAppendHandler_CaseInsensitiveKeepIfBuiltinConflict(t *testing.T) {
 
 	tester := &testHandler{}
 	h := NewAppendMiddleware(&AppendHandlerOptions{
-		KeyCompare:                CaseInsensitiveCmp,
-		ResolveBuiltinKeyConflict: KeepIfBuiltinKeyConflict,
+		KeyCompare: CaseInsensitiveCmp,
+		ResolveKey: KeepIfBuiltinKeyConflict,
 	})(tester)
 
 	log := slog.New(h)

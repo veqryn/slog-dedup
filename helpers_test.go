@@ -77,6 +77,7 @@ func logComplex(t *testing.T, handler slog.Handler) {
 
 	log = log.With("with1", "arg0", "arg1", "with1arg1", "arg2", "with1arg2", "arg3", "with1arg3", slog.SourceKey, "with1source", slog.TimeKey, "with1time", slog.Group("emptyGroup"), "typed", "overwritten", slog.Int("typed", 3))
 	log = log.With("with2", "arg0", "arg1", "with2arg1", "arg3", "with2arg3", "arg4", "with2arg4", "msg#01", "prexisting01", "msg#01a", "seekbug01a", "msg#02", "seekbug02", slog.MessageKey, "with2msg", slog.MessageKey, "with2msg2", slog.LevelKey, "with2level", "group1", "with2group1", slog.Bool("typed", true))
+	log = log.With(slog.Group(slog.LevelKey, "levelGroupKey", "levelGroupValue"), slog.Group("", slog.Group(slog.LevelKey, "inlinedLevelGroupKey", "inlinedLevelGroupValue")))
 	log = log.WithGroup("group1").With(slog.Attr{})
 	log = log.With("with3", "arg0", "arg1", "group1with3arg1", "arg2", "group1with3arg2", "arg3", "group1with3arg3", slog.Group("overwrittenGroup", "arg", "arg"), slog.Group("separateGroup2", "group2", "group2arg0", "arg1", "group2arg1", "arg2", "group2arg2"), slog.SourceKey, "with3source", slog.TimeKey, "with3time")
 	log = log.WithGroup("").WithGroup("")
