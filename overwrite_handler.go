@@ -13,9 +13,16 @@ type OverwriteHandlerOptions struct {
 	// Comparison function to determine if two keys are equal
 	KeyCompare func(a, b string) int
 
-	// Function that will be called on all root level (not in a group) attribute keys.
-	// Returns the new key value to use, and true to keep the attribute or false to drop it.
-	// Can be used to drop, keep, or rename any attributes matching the builtin attributes.
+	// Function that will be called on each attribute and group, to determine
+	// the key to use. Returns the new key value to use, and true to keep the
+	// attribute or false to drop it. Can be used to drop, keep, or rename any
+	// attributes matching the builtin attributes.
+	//
+	// The first argument is a list of currently open groups that contain the
+	// Attr. It must not be retained or modified.
+	//
+	// ResolveKey will not be called for the built-in fields on slog.Record
+	// (ie: time, level, msg, and source).
 	ResolveKey func(groups []string, key string, _ int) (string, bool)
 }
 

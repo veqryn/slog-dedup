@@ -13,16 +13,22 @@ type IncrementHandlerOptions struct {
 	// Comparison function to determine if two keys are equal
 	KeyCompare func(a, b string) int
 
-	// Function that will only be called on all root level (not in a group) attribute keys.
-	// Returns true if the key conflicts with the builtin keys.
-	//DoesBuiltinKeyConflict func(key string) bool
-
-	// IncrementKeyName should return a modified key string based on the index (first, second, third instance seen, etc)
-	//IncrementKeyName func(key string, index int) string
-
-	// Function that will be called on all root level (not in a group) attribute keys.
-	// Returns the new key value to use, and true to keep the attribute or false to drop it.
-	// Can be used to drop, keep, or rename any attributes matching the builtin attributes.
+	// Function that will be called on each attribute and group, to determine
+	// the key to use. Returns the new key value to use, and true to keep the
+	// attribute or false to drop it. Can be used to drop, keep, or rename any
+	// attributes matching the builtin attributes.
+	//
+	// For the IncrementHandler, it should return a modified key string based on
+	// the index (first = 0, second = 1, third = 2, etc).
+	// If the key is at the root level (groups is empty) and conflicts with a
+	// builtin key on the slog.Record object (time, level, msg, source), the
+	// index should be incremented before calculating the modified key string.
+	//
+	// The first argument is a list of currently open groups that contain the
+	// Attr. It must not be retained or modified.
+	//
+	// ResolveKey will not be called for the built-in fields on slog.Record
+	// (ie: time, level, msg, and source).
 	ResolveKey func(groups []string, key string, index int) (string, bool)
 }
 

@@ -7,7 +7,7 @@ import (
 )
 
 // JoinResolveKey can be used to join together many slogdedup middlewares
-// ...HandlerOptions.ResolveKey functions into a single one that applies all the
+// xHandlerOptions.ResolveKey functions into a single one that applies all the
 // rules in order.
 func JoinResolveKey(resolveKeyFunctions ...func(groups []string, key string, index int) (string, bool)) func(groups []string, key string, index int) (string, bool) {
 	if len(resolveKeyFunctions) == 0 {
@@ -26,7 +26,7 @@ func JoinResolveKey(resolveKeyFunctions ...func(groups []string, key string, ind
 		if key != originalKey {
 			return key, ok
 		}
-		return IncrementKeyName(key, index), ok
+		return incrementKeyName(key, index), ok
 	}
 }
 
@@ -74,7 +74,6 @@ var sinkGraylog = sink{
 		slog.SourceKey: {key: "sourceLoc"},
 	},
 }
-
 
 // ResolveKeyStackdriver returns a ResolveKey function works for Stackdriver
 // (aka Google Cloud Operations, aka GCP Log Explorer).
@@ -171,7 +170,7 @@ type attrReplacer struct {
 }
 
 // resolveKeys returns a closure that can be used with any slogdedup middlewares
-// ...HandlerOptions.ResolveKey. Its purpose is to replace the key on any
+// xHandlerOptions.ResolveKey. Its purpose is to replace the key on any
 // attributes or groups, except for the builtin attributes. Using replaceAttr on
 // the final handler/sink is still required, in order to replace the builtin
 // attribute keys.
@@ -202,7 +201,7 @@ func resolveKeys(dest sink) func(groups []string, key string, index int) (string
 		// Check builtins last
 		for _, builtin := range dest.builtins {
 			if key == builtin {
-				return IncrementKeyName(key, index+1), true
+				return incrementKeyName(key, index+1), true
 			}
 		}
 		return key, true
