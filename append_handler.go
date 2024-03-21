@@ -3,6 +3,7 @@ package slogdedup
 import (
 	"context"
 	"log/slog"
+	"slices"
 
 	"modernc.org/b/v2"
 )
@@ -15,7 +16,7 @@ type AppendHandlerOptions struct {
 	// Function that will be called on all root level (not in a group) attribute keys.
 	// Returns the new key value to use, and true to keep the attribute or false to drop it.
 	// Can be used to drop, keep, or rename any attributes matching the builtin attributes.
-	ResolveBuiltinKeyConflict func(k string) (string, bool)
+	ResolveKey func(groups []string, key string, _ int) (string, bool)
 }
 
 // AppendHandler is a slog.Handler middleware that will deduplicate all attributes and
@@ -25,7 +26,7 @@ type AppendHandler struct {
 	next       slog.Handler
 	goa        *groupOrAttrs
 	keyCompare func(a, b string) int
-	getKey     func(key string, depth int) (string, bool)
+	resolveKey func(groups []string, key string, _ int) (string, bool)
 }
 
 var _ slog.Handler = &AppendHandler{} // Assert conformance with interface
@@ -59,14 +60,14 @@ func NewAppendHandler(next slog.Handler, opts *AppendHandlerOptions) *AppendHand
 	if opts.KeyCompare == nil {
 		opts.KeyCompare = CaseSensitiveCmp
 	}
-	if opts.ResolveBuiltinKeyConflict == nil {
-		opts.ResolveBuiltinKeyConflict = IncrementIfBuiltinKeyConflict
+	if opts.ResolveKey == nil {
+		opts.ResolveKey = IncrementIfBuiltinKeyConflict
 	}
 
 	return &AppendHandler{
 		next:       next,
 		keyCompare: opts.KeyCompare,
-		getKey:     getKeyClosure(opts.ResolveBuiltinKeyConflict),
+		resolveKey: opts.ResolveKey,
 	}
 }
 
@@ -89,7 +90,7 @@ func (h *AppendHandler) Handle(ctx context.Context, r slog.Record) error {
 
 	// Resolve groups and with-attributes
 	uniq := b.TreeNew[string, any](h.keyCompare)
-	h.createAttrTree(uniq, goas, 0)
+	h.createAttrTree(uniq, goas, nil)
 
 	// Add all attributes to new record (because old record has all the old attributes)
 	newR := &slog.Record{
@@ -121,16 +122,16 @@ func (h *AppendHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
 
 // createAttrTree recursively goes through all groupOrAttrs, resolving their attributes and creating subtrees as
 // necessary, adding the results to the map
-func (h *AppendHandler) createAttrTree(uniq *b.Tree[string, any], goas []*groupOrAttrs, depth int) {
+func (h *AppendHandler) createAttrTree(uniq *b.Tree[string, any], goas []*groupOrAttrs, groups []string) {
 	if len(goas) == 0 {
 		return
 	}
 
 	// If a group is encountered, create a subtree for that group and all groupOrAttrs after it
 	if goas[0].group != "" {
-		if key, keep := h.getKey(goas[0].group, depth); keep {
+		if key, keep := h.resolveKey(groups, goas[0].group, 0); keep {
 			uniqGroup := b.TreeNew[string, any](h.keyCompare)
-			h.createAttrTree(uniqGroup, goas[1:], depth+1)
+			h.createAttrTree(uniqGroup, goas[1:], append(slices.Clip(groups), key))
 			// Ignore empty groups, otherwise put subtree into the map
 			if uniqGroup.Len() > 0 {
 				// Put calls func(oldValue, true) if key already exists, or func(oldValue, false) if it doesn't.
@@ -151,15 +152,15 @@ func (h *AppendHandler) createAttrTree(uniq *b.Tree[string, any], goas []*groupO
 	}
 
 	// Otherwise, set all attributes for this groupOrAttrs, and then call again for remaining groupOrAttrs's
-	h.resolveValues(uniq, goas[0].attrs, depth)
-	h.createAttrTree(uniq, goas[1:], depth)
+	h.resolveValues(uniq, goas[0].attrs, groups)
+	h.createAttrTree(uniq, goas[1:], groups)
 }
 
 // resolveValues iterates through the attributes, resolving them and putting them into the map.
 // If a group is encountered (as an attribute), it will be separately resolved and added as a subtree.
 // Since attributes are ordered from oldest to newest, it creates a slice whenever it detects the key already exists,
 // appending the new attribute, then overwriting the key with that slice.
-func (h *AppendHandler) resolveValues(uniq *b.Tree[string, any], attrs []slog.Attr, depth int) {
+func (h *AppendHandler) resolveValues(uniq *b.Tree[string, any], attrs []slog.Attr, groups []string) {
 	var keep bool
 	for _, a := range attrs {
 		a.Value = a.Value.Resolve()
@@ -168,7 +169,7 @@ func (h *AppendHandler) resolveValues(uniq *b.Tree[string, any], attrs []slog.At
 		}
 
 		// Default situation: resolve the key and put it into the map
-		a.Key, keep = h.getKey(a.Key, depth)
+		a.Key, keep = h.resolveKey(groups, a.Key, 0)
 		if !keep {
 			continue
 		}
@@ -189,13 +190,13 @@ func (h *AppendHandler) resolveValues(uniq *b.Tree[string, any], attrs []slog.At
 
 		// Groups with empty keys are inlined
 		if a.Key == "" {
-			h.resolveValues(uniq, a.Value.Group(), depth)
+			h.resolveValues(uniq, a.Value.Group(), groups)
 			continue
 		}
 
 		// Create a subtree for this group
 		uniqGroup := b.TreeNew[string, any](h.keyCompare)
-		h.resolveValues(uniqGroup, a.Value.Group(), depth+1)
+		h.resolveValues(uniqGroup, a.Value.Group(), append(slices.Clip(groups), a.Key))
 
 		// Ignore empty groups, otherwise put subtree into the map
 		if uniqGroup.Len() > 0 {

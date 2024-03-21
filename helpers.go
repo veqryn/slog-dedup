@@ -8,42 +8,28 @@ import (
 	"modernc.org/b/v2"
 )
 
-// TODO: also create a sorting middleware as well
-// TODO: also create a pretty json printer that still prints to only 1 line, just prettier
-
-// getKeyClosure returns a function to be used to resolve a key at the root level, determining its behavior when it
-// would otherwise conflict/duplicate the 4 built-in attribute keys (time, level, msg, source).
-func getKeyClosure(resolveBuiltinKeyConflict func(k string) (string, bool)) func(key string, depth int) (string, bool) {
-	return func(key string, depth int) (string, bool) {
-		if depth == 0 {
-			return resolveBuiltinKeyConflict(key)
-		}
-		return key, true
-	}
-}
-
 // IncrementIfBuiltinKeyConflict will, if there is a conflict/duplication at the root level (not in a group) with one of
 // the built-in keys, add "#01" to the end of the key
-func IncrementIfBuiltinKeyConflict(key string) (string, bool) {
-	if DoesBuiltinKeyConflict(key) {
-		return IncrementKeyName(key, 1), true // Don't overwrite the built-in attribute keys
+func IncrementIfBuiltinKeyConflict(groups []string, key string, index int) (string, bool) {
+	if len(groups) == 0 && DoesBuiltinKeyConflict(key) {
+		return IncrementKeyName(key, index+1), true // Don't overwrite the built-in attribute keys
 	}
-	return key, true
+	return IncrementKeyName(key, index), true
 }
 
 // DropIfBuiltinKeyConflict will, if there is a conflict/duplication at the root level (not in a group) with one of the
 // built-in keys, drop the whole attribute
-func DropIfBuiltinKeyConflict(key string) (string, bool) {
-	if DoesBuiltinKeyConflict(key) {
+func DropIfBuiltinKeyConflict(groups []string, key string, index int) (string, bool) {
+	if len(groups) == 0 && DoesBuiltinKeyConflict(key) {
 		return "", false // Drop the attribute
 	}
-	return key, true
+	return IncrementKeyName(key, index), true
 }
 
 // KeepIfBuiltinKeyConflict will keep all keys even if there would be a conflict/duplication at the root level (not in a
 // group) with one of the built-in keys
-func KeepIfBuiltinKeyConflict(key string) (string, bool) {
-	return key, true // Keep all
+func KeepIfBuiltinKeyConflict(_ []string, key string, index int) (string, bool) {
+	return IncrementKeyName(key, index), true // Keep all
 }
 
 // DoesBuiltinKeyConflict returns true if the key conflicts with the builtin keys.
