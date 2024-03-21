@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func TestFoo(t *testing.T) {
+func TestResolveKeyReplaceAttr(t *testing.T) {
 	t.Parallel()
 
 	resolvers := JoinResolveKey(
@@ -40,7 +40,7 @@ func TestFoo(t *testing.T) {
 		},
 		{
 			hander:   NewIgnoreHandler(tester, &IgnoreHandlerOptions{ResolveKey: resolvers}),
-			expected: `{"time":"2023-09-29T13:00:59Z","severity":"WARNING","logging.googleapis.com/sourceLocation":{"function":"github.com/veqryn/slog-dedup.logComplex","file":"github.com/veqryn/slog-dedup/helpers_test.go","line":"85"},"message":"main message","arg1":"with1arg1","arg2":"with1arg2","arg3":"with1arg3","arg4":"with2arg4","group1":"with2group1","logging.googleapis.com/sourceLocation#01":"with1source","message#01":"with2msg","msg#01":"prexisting01","msg#01a":"seekbug01a","msg#02":"seekbug02","severity#01":"with2level","sourceLoc#01":"sourceLocArg","time#01":"with1time","timestampRenamed":"timestampArg","typed":"overwritten","with1":"arg0","with2":"arg0"`,
+			expected: `{"time":"2023-09-29T13:00:59Z","severity":"WARNING","logging.googleapis.com/sourceLocation":{"function":"github.com/veqryn/slog-dedup.logComplex","file":"github.com/veqryn/slog-dedup/helpers_test.go","line":"85"},"message":"main message","arg1":"with1arg1","arg2":"with1arg2","arg3":"with1arg3","arg4":"with2arg4","group1":"with2group1","logging.googleapis.com/sourceLocation#01":"with1source","message#01":"with2msg","msg#01":"prexisting01","msg#01a":"seekbug01a","msg#02":"seekbug02","severity#01":"with2level","sourceLoc#01":"sourceLocArg","time#01":"with1time","timestampRenamed":"timestampArg","typed":"overwritten","with1":"arg0","with2":"arg0"}`,
 		},
 		{
 			hander:   NewAppendHandler(tester, &AppendHandlerOptions{ResolveKey: resolvers}),

@@ -1,7 +1,6 @@
 package slogdedup
 
 import (
-	"fmt"
 	"log/slog"
 	"strconv"
 )
@@ -102,19 +101,19 @@ var sinkStackdriver = sink{
 			switch lvl := v.Any().(type) {
 			case slog.Level:
 				if lvl <= slog.LevelDebug {
-					return slog.StringValue("DEBUG")
+					return slog.StringValue("DEBUG") // -4
 				} else if lvl <= slog.LevelInfo {
-					return slog.StringValue("INFO")
-				} else if lvl < slog.LevelWarn {
-					return slog.StringValue("NOTICE")
-				} else if lvl == slog.LevelWarn {
-					return slog.StringValue("WARNING")
+					return slog.StringValue("INFO") // 0
+				} else if lvl <= slog.LevelInfo+2 {
+					return slog.StringValue("NOTICE") // 2
+				} else if lvl <= slog.LevelWarn {
+					return slog.StringValue("WARNING") // 4
 				} else if lvl <= slog.LevelError {
-					return slog.StringValue("ERROR")
+					return slog.StringValue("ERROR") // 8
 				} else if lvl <= slog.LevelError+4 {
-					return slog.StringValue("CRITICAL")
+					return slog.StringValue("CRITICAL") // 12
 				} else if lvl <= slog.LevelError+8 {
-					return slog.StringValue("ALERT")
+					return slog.StringValue("ALERT") // 16
 				}
 				return slog.StringValue("EMERGENCY")
 			default:
@@ -146,7 +145,6 @@ var sinkStackdriver = sink{
 					Line:     strconv.Itoa(source.Line),
 				})
 			default:
-				fmt.Printf("SOURCE: %T: %#+v\n", source, source)
 				return v
 			}
 		}},
