@@ -46,6 +46,37 @@ func JoinReplaceAttr(replaceAttrFunctions ...func(groups []string, a slog.Attr) 
 	}
 }
 
+// ResolveKeyGraylog returns a ResolveKey function works for Graylog.
+func ResolveKeyGraylog() func(groups []string, key string, index int) (string, bool) {
+	return resolveKeys(sinkGraylog)
+}
+
+// ReplaceAttrGraylog returns a ReplaceAttr function works for Graylog.
+func ReplaceAttrGraylog() func(groups []string, a slog.Attr) slog.Attr {
+	return replaceAttr(sinkGraylog)
+}
+
+// Graylog https://graylog.org/
+var sinkGraylog = sink{
+	builtins: []string{slog.TimeKey, slog.LevelKey, "message", "sourceLoc"},
+	replacers: map[string]attrReplacer{
+		// "timestamp" is the time of the record. Defaults to the time the log was received by grayload.
+		// If using a json extractor or rule, Graylog needs to have it set to a time object, not a string.
+		// So best to let your timestamp come in under a different key, then set it specifically with a pipeline rule.
+		"timestamp": {key: "timestampRenamed"},
+
+		// "message" is what Graylog will show when skimming. It defaults to the entire log payload.
+		// Have the builtin message use this as its key.
+		slog.MessageKey: {key: "message"},
+
+		// "source" is the IP address or similar of where the logs came from.
+		// Let Graylog keep its enchriched field, and rename our source location.
+		slog.SourceKey: {key: "sourceLoc"},
+	},
+}
+
+
+
 // sink represents the final destination of the logs.
 type sink struct {
 	// Only the keys that will be used for the builtins:
