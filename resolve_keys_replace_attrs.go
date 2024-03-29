@@ -45,110 +45,150 @@ func JoinReplaceAttr(replaceAttrFunctions ...func(groups []string, a slog.Attr) 
 	}
 }
 
+// ResolveReplaceOptions is a struct of optional options that change the
+// behavior of the ResolveKey and ReplaceAttr functions.
+type ResolveReplaceOptions struct {
+	// OverwriteSummary, if true and applicable to the log sink, will ensure the
+	// builtin slog.Record "msg" key will be changed to the appropriate
+	// "message" or "summary" key for that sink (usually causing the msg to show
+	// up as the log line summary when skimming.
+	OverwriteSummary bool
+}
+
 // ResolveKeyGraylog returns a ResolveKey function works for Graylog.
-func ResolveKeyGraylog() func(groups []string, key string, index int) (string, bool) {
-	return resolveKeys(sinkGraylog)
+// If OverwriteSummary is true, the slog.Record "msg" key will be changed to "message",
+// causing it to show up as the main log line when skimming.
+func ResolveKeyGraylog(options *ResolveReplaceOptions) func(groups []string, key string, index int) (string, bool) {
+	return resolveKeys(sinkGraylog(options))
 }
 
 // ReplaceAttrGraylog returns a ReplaceAttr function works for Graylog.
-func ReplaceAttrGraylog() func(groups []string, a slog.Attr) slog.Attr {
-	return replaceAttr(sinkGraylog)
+// If OverwriteSummary is true, the slog.Record "msg" key will be changed to "message",
+// causing it to show up as the main log line when skimming.
+func ReplaceAttrGraylog(options *ResolveReplaceOptions) func(groups []string, a slog.Attr) slog.Attr {
+	return replaceAttr(sinkGraylog(options))
 }
 
 // Graylog https://graylog.org/
-var sinkGraylog = sink{
-	builtins: []string{slog.TimeKey, slog.LevelKey, "message", "sourceLoc"},
-	replacers: map[string]attrReplacer{
-		// "timestamp" is the time of the record. Defaults to the time the log was received by grayload.
-		// If using a json extractor or rule, Graylog needs to have it set to a time object, not a string.
-		// So best to let your timestamp come in under a different key, then set it specifically with a pipeline rule.
-		"timestamp": {key: "timestampRenamed"},
-
+func sinkGraylog(options *ResolveReplaceOptions) sink {
+	finalMsgKey := slog.MessageKey
+	if options != nil && options.OverwriteSummary {
 		// "message" is what Graylog will show when skimming. It defaults to the entire log payload.
 		// Have the builtin message use this as its key.
-		slog.MessageKey: {key: "message"},
+		finalMsgKey = "message"
+	}
 
-		// "source" is the IP address or similar of where the logs came from.
-		// Let Graylog keep its enchriched field, and rename our source location.
-		slog.SourceKey: {key: "sourceLoc"},
-	},
+	return sink{
+		// builtins are going to be the FINAL key namess for the 4 builtin fields on slog.Record.
+		// We will also add in any fields we want incremented, if they would be assigned a special value by graylog.
+		// In this case, we want to increment "message" regardless of whether it will be overwritten by the "msg" builtin or not.
+		builtins: []string{slog.TimeKey, slog.LevelKey, finalMsgKey, "sourceLoc", "message"},
+		replacers: map[string]attrReplacer{
+			// "timestamp" is the time of the record. Defaults to the time the log was received by grayload.
+			// If using a json extractor or rule, Graylog needs to have it set to a time object, not a string.
+			// So best to let your timestamp come in under a different key, then set it specifically with a pipeline rule.
+			"timestamp": {key: "timestampRenamed"},
+
+			slog.MessageKey: {key: finalMsgKey},
+
+			// "source" is the IP address or similar of where the logs came from.
+			// Let Graylog keep its enchriched field, and rename our source location.
+			slog.SourceKey: {key: "sourceLoc"},
+		},
+	}
 }
 
 // ResolveKeyStackdriver returns a ResolveKey function works for Stackdriver
 // (aka Google Cloud Operations, aka GCP Log Explorer).
-func ResolveKeyStackdriver() func(groups []string, key string, index int) (string, bool) {
-	return resolveKeys(sinkStackdriver)
+// If OverwriteSummary is true, the slog.Record "msg" key will be changed to "message",
+// causing it to show up as the main log line when skimming.
+func ResolveKeyStackdriver(options *ResolveReplaceOptions) func(groups []string, key string, index int) (string, bool) {
+	return resolveKeys(sinkStackdriver(options))
 }
 
 // ReplaceAttrStackdriver returns a ReplaceAttr function works for Stackdriver
 // (aka Google Cloud Operations, aka GCP Log Explorer).
-func ReplaceAttrStackdriver() func(groups []string, a slog.Attr) slog.Attr {
-	return replaceAttr(sinkStackdriver)
+// If OverwriteSummary is true, the slog.Record "msg" key will be changed to "message",
+// causing it to show up as the main log line when skimming.
+func ReplaceAttrStackdriver(options *ResolveReplaceOptions) func(groups []string, a slog.Attr) slog.Attr {
+	return replaceAttr(sinkStackdriver(options))
 }
 
 // Stackdriver, aka Google Cloud Operations, aka GCP Log Explorer
 // https://cloud.google.com/products/operations
-var sinkStackdriver = sink{
-	builtins: []string{slog.TimeKey, "severity", "message", "logging.googleapis.com/sourceLocation"},
-	replacers: map[string]attrReplacer{
-		// The default slog time key is "time", which stackdriver will detect and parse:
-		// https://cloud.google.com/logging/docs/agent/logging/configuration#special-fields
-
-		// "severity" is what Stackdriver uses for the log level:
-		// https://cloud.google.com/logging/docs/reference/v2/rest/v2/LogEntry#LogSeverity
-		// Have the builtin level use this as its key.
-		slog.LevelKey: {key: "severity", valuer: func(v slog.Value) slog.Value {
-			switch lvl := v.Any().(type) {
-			case slog.Level:
-				if lvl <= slog.LevelDebug {
-					return slog.StringValue("DEBUG") // -4
-				} else if lvl <= slog.LevelInfo {
-					return slog.StringValue("INFO") // 0
-				} else if lvl <= slog.LevelInfo+2 {
-					return slog.StringValue("NOTICE") // 2
-				} else if lvl <= slog.LevelWarn {
-					return slog.StringValue("WARNING") // 4
-				} else if lvl <= slog.LevelError {
-					return slog.StringValue("ERROR") // 8
-				} else if lvl <= slog.LevelError+4 {
-					return slog.StringValue("CRITICAL") // 12
-				} else if lvl <= slog.LevelError+8 {
-					return slog.StringValue("ALERT") // 16
-				}
-				return slog.StringValue("EMERGENCY")
-			default:
-				return v
-			}
-		}},
-
+func sinkStackdriver(options *ResolveReplaceOptions) sink {
+	finalMsgKey := slog.MessageKey
+	if options != nil && options.OverwriteSummary {
 		// "message" is what Stackdriver will show when skimming. It defaults to the entire log payload.
 		// Have the builtin message use this as its key.
-		slog.MessageKey: {key: "message"},
+		finalMsgKey = "message"
+	}
 
-		// "logging.googleapis.com/sourceLocation" is what Stackdriver expects for
-		// the key containing the file, line, and function values.
-		// Have the builtin source use this as its key.
-		slog.SourceKey: {key: "logging.googleapis.com/sourceLocation", valuer: func(v slog.Value) slog.Value {
-			// https://cloud.google.com/logging/docs/reference/v2/rest/v2/LogEntry#LogEntrySourceLocation
-			switch source := v.Any().(type) {
-			case *slog.Source:
-				if source == nil {
+	return sink{
+		// builtins are going to be the FINAL key namess for the 4 builtin fields on slog.Record.
+		// We will also add in any fields we want incremented, if they would be assigned a special value by graylog.
+		// In this case, we want to increment "message" regardless of whether it will be overwritten by the "msg" builtin or not.
+		builtins: []string{slog.TimeKey, "severity", finalMsgKey, "logging.googleapis.com/sourceLocation", "message"},
+		replacers: map[string]attrReplacer{
+			// The default slog time key is "time", which stackdriver will detect and parse:
+			// https://cloud.google.com/logging/docs/agent/logging/configuration#special-fields
+
+			// "severity" is what Stackdriver uses for the log level:
+			// https://cloud.google.com/logging/docs/reference/v2/rest/v2/LogEntry#LogSeverity
+			// Have the builtin level use this as its key.
+			slog.LevelKey: {key: "severity", valuer: func(v slog.Value) slog.Value {
+				switch lvl := v.Any().(type) {
+				case slog.Level:
+					if lvl <= slog.LevelDebug {
+						return slog.StringValue("DEBUG") // -4
+					} else if lvl <= slog.LevelInfo {
+						return slog.StringValue("INFO") // 0
+					} else if lvl <= slog.LevelInfo+2 {
+						return slog.StringValue("NOTICE") // 2
+					} else if lvl <= slog.LevelWarn {
+						return slog.StringValue("WARNING") // 4
+					} else if lvl <= slog.LevelError {
+						return slog.StringValue("ERROR") // 8
+					} else if lvl <= slog.LevelError+4 {
+						return slog.StringValue("CRITICAL") // 12
+					} else if lvl <= slog.LevelError+8 {
+						return slog.StringValue("ALERT") // 16
+					}
+					return slog.StringValue("EMERGENCY")
+				default:
 					return v
 				}
-				return slog.AnyValue(struct {
-					Function string `json:"function"`
-					File     string `json:"file"`
-					Line     string `json:"line"` // slog.Source.Line is an int, GCP wants a string
-				}{
-					Function: source.Function,
-					File:     source.File,
-					Line:     strconv.Itoa(source.Line),
-				})
-			default:
-				return v
-			}
-		}},
-	},
+			}},
+
+			// "message" is what Stackdriver will show when skimming. It defaults to the entire log payload.
+			// Have the builtin message use this as its key.
+			slog.MessageKey: {key: finalMsgKey},
+
+			// "logging.googleapis.com/sourceLocation" is what Stackdriver expects for
+			// the key containing the file, line, and function values.
+			// Have the builtin source use this as its key.
+			slog.SourceKey: {key: "logging.googleapis.com/sourceLocation", valuer: func(v slog.Value) slog.Value {
+				// https://cloud.google.com/logging/docs/reference/v2/rest/v2/LogEntry#LogEntrySourceLocation
+				switch source := v.Any().(type) {
+				case *slog.Source:
+					if source == nil {
+						return v
+					}
+					return slog.AnyValue(struct {
+						Function string `json:"function"`
+						File     string `json:"file"`
+						Line     string `json:"line"` // slog.Source.Line is an int, GCP wants a string
+					}{
+						Function: source.Function,
+						File:     source.File,
+						Line:     strconv.Itoa(source.Line),
+					})
+				default:
+					return v
+				}
+			}},
+		},
+	}
 }
 
 // sink represents the final destination of the logs.
@@ -189,14 +229,15 @@ func resolveKeys(dest sink) func(groups []string, key string, index int) (string
 			return key, true
 		}
 
-		// Check replacers first
+		// Check replacers first. This will skip the builtin fields on slog.Record
 		for oldKey, replacement := range dest.replacers {
 			if key == oldKey {
 				key = replacement.key
 			}
 		}
 
-		// Check builtins last
+		// Check builtins last. This will rename any regular attributes so that
+		// they don't conflict with the builtin fields on slog.Record
 		for _, builtin := range dest.builtins {
 			if key == builtin {
 				return incrementKeyName(key, index+1), true
@@ -221,6 +262,7 @@ func replaceAttr(dest sink) func(groups []string, a slog.Attr) slog.Attr {
 			return a
 		}
 
+		// This will still catch the builtin fields.
 		for oldKey, replacement := range dest.replacers {
 			if a.Key == oldKey {
 				a.Key = replacement.key
