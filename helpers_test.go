@@ -100,7 +100,8 @@ func logComplex(t *testing.T, handler slog.Handler) {
 	log.Warn("main message", "main1", "arg0", "arg1", "main1arg1", "arg6", "main1arg6", slog.LevelKey, "main1overwritten", slog.LevelKey, "main1level", slog.Group("main1group3", "group3", "group3overwritten", "group3", "group3arg0"))
 }
 
-func TestSlogJsonHandler(t *testing.T) {
+// Rename to Test... to get the output above
+func SlogJsonHandler(t *testing.T) {
 	t.Parallel()
 
 	buf := &bytes.Buffer{}
@@ -113,7 +114,7 @@ func TestSlogJsonHandler(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Log(pretty.String())
+	t.Error(pretty.String())
 }
 
 type testHandler struct {

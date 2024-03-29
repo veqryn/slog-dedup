@@ -160,8 +160,6 @@ func sinkStackdriver(options *ResolveReplaceOptions) sink {
 				}
 			}},
 
-			// "message" is what Stackdriver will show when skimming. It defaults to the entire log payload.
-			// Have the builtin message use this as its key.
 			slog.MessageKey: {key: finalMsgKey},
 
 			// "logging.googleapis.com/sourceLocation" is what Stackdriver expects for
@@ -229,7 +227,7 @@ func resolveKeys(dest sink) func(groups []string, key string, index int) (string
 			return key, true
 		}
 
-		// Check replacers first. This will skip the builtin fields on slog.Record
+		// Check replacers first. (slog.Record built fields are not present, see above comment)
 		for oldKey, replacement := range dest.replacers {
 			if key == oldKey {
 				key = replacement.key
