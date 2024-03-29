@@ -85,9 +85,9 @@ Usage:
 	logger := slog.New(slogdedup.NewOverwriteHandler(
 		slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
 			AddSource:   true,
-			ReplaceAttr: slogdedup.ReplaceAttrStackdriver(), // Needed for builtin's
+			ReplaceAttr: slogdedup.ReplaceAttrStackdriver(nil), // Needed for builtin's
 		}),
-		&slogdedup.OverwriteHandlerOptions{ResolveKey: slogdedup.ResolveKeyStackdriver()}, // Needed for everything else, and deduplication
+		&slogdedup.OverwriteHandlerOptions{ResolveKey: slogdedup.ResolveKeyStackdriver(nil)}, // Needed for everything else, and deduplication
 	))
 
 	// {

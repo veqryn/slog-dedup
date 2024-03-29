@@ -3,6 +3,7 @@ package slogdedup
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"log/slog"
 	"testing"
 	"time"
@@ -12,62 +13,75 @@ import (
 What the log output would look like if duplicates were allowed, and sorted for easier reading:
 
 	{
-	    "time":"2023-09-29T13:00:59Z",
-	    "level":"INFO",
-	    "msg":"main message",
-	    "arg1":"with1arg1",
-	    "arg1":"with2arg1",
-	    "arg2":"with1arg2",
-	    "arg3":"with1arg3",
-	    "arg3":"with2arg3",
-	    "arg4":"with2arg4",
-	    "group1":"with2group1",
-	    "group1":{
-	        "arg1":"group1with3arg1",
-	        "arg1":"group1with4arg1",
-	        "arg1":"main1arg1",
-	        "arg2":"group1with3arg2",
-	        "arg3":"group1with3arg3",
-	        "arg3":"group1with4arg3",
-	        "arg4":"group1with4arg4",
-	        "arg5":"with4inlinedGroupArg5",
-	        "arg6":"main1arg6",
-	        "level":"with4overwritten",
-	        "level":"main1overwritten",
-	        "level":"main1level",
-	        "main1":"arg0",
-	        "main1group3":{
-	            "group3":"group3overwritten",
-	            "group3":"group3arg0"
-	        },
-	        "msg":"with4msg",
-	        "overwrittenGroup":{
-	            "arg":"arg"
-	        },
-	        "overwrittenGroup":"with4overwrittenGroup",
-	        "separateGroup2":{
-	            "arg1":"group2arg1",
-	            "arg2":"group2arg2",
-	            "group2":"group2arg0"
-	        },
-	        "source":"with3source",
-	        "time":"with3time",
-	        "with3":"arg0",
-	        "with4":"arg0"
-	    },
-	    "level":"with2level",
-	    "msg#01":"prexisting01",
-	    "msg#01a":"seekbug01a",
-	    "msg#02":"seekbug02",
-	    "msg":"with2msg",
-	    "msg":"with2msg2",
-	    "source":"with1source",
-	    "time":"with1time",
-	    "typed":"overwritten",
-	    "typed":3,
-	    "typed":true,
-	    "with1":"arg0",
-	    "with2":"arg0"
+		"arg1": "with1arg1",
+		"arg1": "with2arg1",
+		"arg2": "with1arg2",
+		"arg3": "with1arg3",
+		"arg3": "with2arg3",
+		"arg4": "with2arg4",
+		"group1": "with2group1",
+		"group1": {
+			"arg1": "group1with3arg1",
+			"arg1": "group1with4arg1",
+			"arg1": "main1arg1",
+			"arg2": "group1with3arg2",
+			"arg3": "group1with3arg3",
+			"arg3": "group1with4arg3",
+			"arg4": "group1with4arg4",
+			"arg5": "with4inlinedGroupArg5",
+			"arg6": "main1arg6",
+			"level": "with4overwritten",
+			"level": "main1overwritten",
+			"level": "main1level",
+			"main1": "arg0",
+			"main1group3": {
+				"group3": "group3overwritten",
+				"group3": "group3arg0"
+			},
+			"msg": "with4msg",
+			"overwrittenGroup": {
+				"arg": "arg"
+			},
+			"overwrittenGroup": "with4overwrittenGroup",
+			"separateGroup2": {
+				"arg1": "group2arg1",
+				"arg2": "group2arg2",
+				"group2": "group2arg0"
+			},
+			"source": "with3source",
+			"time": "with3time",
+			"with3": "arg0",
+			"with4": "arg0"
+		},
+		"level": "WARN",
+		"level": "with2level",
+		"level": {
+			"levelGroupKey": "levelGroupValue"
+		},
+		"level": {
+			"inlinedLevelGroupKey": "inlinedLevelGroupValue"
+		},
+		"logging.googleapis.com/sourceLocation": "sourceLocationArg",
+		"message": "messageArg",
+		"message#01": "message#01Arg",
+		"msg": "main message",
+		"msg": "with2msg",
+		"msg": "with2msg2",
+		"msg#01": "prexisting01",
+		"msg#01a": "seekbug01a",
+		"msg#02": "seekbug02",
+		"severity": "severityArg",
+		"source": "with1source",
+		"sourceLoc": "sourceLocArg",
+		"time": "2024-03-29T16:18:25.924174-06:00",
+		"time": "with1time",
+		"timestamp": "timestampArg",
+		"timestampRenamed": "timestampRenamedArg",
+		"typed": "overwritten",
+		"typed": 3,
+		"typed": true,
+		"with1": "arg0",
+		"with2": "arg0"
 	}
 */
 func logComplex(t *testing.T, handler slog.Handler) {
@@ -84,6 +98,23 @@ func logComplex(t *testing.T, handler slog.Handler) {
 	log = log.WithGroup("").WithGroup("")
 	log = log.With("with4", "arg0", "arg1", "group1with4arg1", "arg3", "group1with4arg3", "arg4", "group1with4arg4", slog.Group("", "arg5", "with4inlinedGroupArg5"), slog.String("overwrittenGroup", "with4overwrittenGroup"), slog.MessageKey, "with4msg", slog.LevelKey, "with4overwritten")
 	log.Warn("main message", "main1", "arg0", "arg1", "main1arg1", "arg6", "main1arg6", slog.LevelKey, "main1overwritten", slog.LevelKey, "main1level", slog.Group("main1group3", "group3", "group3overwritten", "group3", "group3arg0"))
+}
+
+// Rename to Test... to get the output above
+func SlogJsonHandler(t *testing.T) {
+	t.Parallel()
+
+	buf := &bytes.Buffer{}
+	h := slog.NewJSONHandler(buf, &slog.HandlerOptions{Level: slog.LevelDebug})
+
+	logComplex(t, h)
+
+	pretty := &bytes.Buffer{}
+	err := json.Indent(pretty, buf.Bytes(), "", "    ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Error(pretty.String())
 }
 
 type testHandler struct {

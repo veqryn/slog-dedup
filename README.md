@@ -157,9 +157,9 @@ Outputs:
 logger := slog.New(slogdedup.NewOverwriteHandler(
 	slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
 		AddSource:   true,
-		ReplaceAttr: slogdedup.ReplaceAttrStackdriver(), // Needed for builtin's
+		ReplaceAttr: slogdedup.ReplaceAttrStackdriver(nil), // Needed for builtin's
 	}),
-	&slogdedup.OverwriteHandlerOptions{ResolveKey: slogdedup.ResolveKeyStackdriver()}, // Needed for everything else, and deduplication
+	&slogdedup.OverwriteHandlerOptions{ResolveKey: slogdedup.ResolveKeyStackdriver(nil)}, // Needed for everything else, and deduplication
 ))
 logger.Warn("this is the main message", slog.String("duplicated", "zero"), slog.String("duplicated", "one"))
 ```
@@ -289,16 +289,16 @@ func main() {
 	// First, create a function to resolve/replace attribute keys before deduplication,
 	// which will also ensure the builtin keys are unused by non-builtin attributes:
 	resolveKey := slogdedup.JoinResolveKey(
-		slogdedup.ResolveKeyStackdriver(),
-		slogdedup.ResolveKeyGraylog(),
+		slogdedup.ResolveKeyStackdriver(nil),
+		slogdedup.ResolveKeyGraylog(nil),
 	)
 
 	// Second, create a function to replace the builtin record attributes
 	// (time, level, msg, source) with the appropriate keys and values for
 	// Stackdriver and Graylog:
 	replaceAttr := slogdedup.JoinReplaceAttr(
-		slogdedup.ReplaceAttrStackdriver(),
-		slogdedup.ReplaceAttrGraylog(),
+		slogdedup.ReplaceAttrStackdriver(nil),
+		slogdedup.ReplaceAttrGraylog(nil),
 	)
 
 	// Next create the final handler (the sink), which is a json handler,
@@ -338,6 +338,10 @@ func main() {
 ```
 
 ## Breaking Changes
+### O.4.x -> 0.5.0
+Resolvers and Replacers (such as `ResolveKeyStackdriver` and `ReplaceAttrStackdriver`)
+now take an argument of `*ResolveReplaceOptions`, which can be nil for the default behavior.
+
 ### O.3.x -> 0.4.0
 `ResolveBuiltinKeyConflict`,`DoesBuiltinKeyConflict`, and `IncrementKeyName` have
 all been unified into a single function: `ResolveKey`.
