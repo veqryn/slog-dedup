@@ -7,6 +7,93 @@ import (
 	"testing"
 )
 
+func TestResolveKeyReplaceAttrStackdriver(t *testing.T) {
+	t.Parallel()
+
+	tester := &testHandler{}
+	handler := NewIncrementHandler(tester, &IncrementHandlerOptions{ResolveKey: ResolveKeyStackdriver(&ResolveReplaceOptions{OverwriteSummary: true})})
+
+	log := slog.New(handler)
+	log.Info("Hello World", "Foo", "Bar")
+
+	buf := &bytes.Buffer{}
+	err := tester.MarshalWith(slog.NewJSONHandler(buf, &slog.HandlerOptions{AddSource: true, ReplaceAttr: ReplaceAttrStackdriver(&ResolveReplaceOptions{OverwriteSummary: true})}))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// This is what it would be without using the replacers:
+	// {"time":"2023-09-29T13:00:59Z","level":"INFO","source":{"function":"github.com/veqryn/slog-dedup.TestResolveKeyReplaceAttrStackdriver","file":"/Users/cduncan/go/src/github.com/veqryn/slog-dedup/resolve_keys_replace_attrs_test.go","line":17},"msg":"Hello World","Foo":"Bar"}
+
+	// And this is with the replacers:
+	expected := `{"time":"2023-09-29T13:00:59Z","severity":"INFO","logging.googleapis.com/sourceLocation":{"function":"github.com/veqryn/slog-dedup.TestResolveKeyReplaceAttrStackdriver","file":"/Users/cduncan/go/src/github.com/veqryn/slog-dedup/resolve_keys_replace_attrs_test.go","line":"17"},"message":"Hello World","Foo":"Bar"}`
+
+	jStr := strings.TrimSpace(buf.String())
+	if jStr != expected {
+		t.Errorf("Expected:\n%s\nGot:\n%s\n", expected, jStr)
+	}
+
+	checkRecordForDuplicates(t, tester.Record)
+}
+
+func TestResolveKeyReplaceAttrGraylog(t *testing.T) {
+	t.Parallel()
+
+	tester := &testHandler{}
+	handler := NewIncrementHandler(tester, &IncrementHandlerOptions{ResolveKey: ResolveKeyGraylog(&ResolveReplaceOptions{OverwriteSummary: true})})
+
+	log := slog.New(handler)
+	log.Info("Hello World", "Foo", "Bar")
+
+	buf := &bytes.Buffer{}
+	err := tester.MarshalWith(slog.NewJSONHandler(buf, &slog.HandlerOptions{AddSource: true, ReplaceAttr: ReplaceAttrGraylog(&ResolveReplaceOptions{OverwriteSummary: true})}))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// This is what it would be without using the replacers:
+	// {"time":"2023-09-29T13:00:59Z","level":"INFO","source":{"function":"github.com/veqryn/slog-dedup.TestResolveKeyReplaceAttrGraylog","file":"/Users/cduncan/go/src/github.com/veqryn/slog-dedup/resolve_keys_replace_attrs_test.go","line":46},"msg":"Hello World","Foo":"Bar"}
+
+	// And this is with the replacers:
+	expected := `{"time":"2023-09-29T13:00:59Z","level":"INFO","sourceLoc":{"function":"github.com/veqryn/slog-dedup.TestResolveKeyReplaceAttrGraylog","file":"/Users/cduncan/go/src/github.com/veqryn/slog-dedup/resolve_keys_replace_attrs_test.go","line":46},"message":"Hello World","Foo":"Bar"}`
+
+	jStr := strings.TrimSpace(buf.String())
+	if jStr != expected {
+		t.Errorf("Expected:\n%s\nGot:\n%s\n", expected, jStr)
+	}
+
+	checkRecordForDuplicates(t, tester.Record)
+}
+
+func TestResolveKeyReplaceAttrCloudwatch(t *testing.T) {
+	t.Parallel()
+
+	tester := &testHandler{}
+	handler := NewIncrementHandler(tester, nil) // no cloudwatch key resolver needed yet
+
+	log := slog.New(handler)
+	log.Info("Hello World", "Foo", "Bar")
+
+	buf := &bytes.Buffer{}
+	err := tester.MarshalWith(slog.NewJSONHandler(buf, &slog.HandlerOptions{AddSource: false, ReplaceAttr: ReplaceAttrCloudwatch(nil)}))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// This is what it would be without using the replacers:
+	// {"time":"2023-09-29T13:00:59Z","level":"INFO","msg":"Hello World","Foo":"Bar"}
+
+	// And this is with the replacers:
+	expected := `{"time":"2023-09-29T13:00:59.000000000Z","level":"INFO","msg":"Hello World","Foo":"Bar"}`
+
+	jStr := strings.TrimSpace(buf.String())
+	if jStr != expected {
+		t.Errorf("Expected:\n%s\nGot:\n%s\n", expected, jStr)
+	}
+
+	checkRecordForDuplicates(t, tester.Record)
+}
+
 func TestResolveKeyReplaceAttr(t *testing.T) {
 	t.Parallel()
 

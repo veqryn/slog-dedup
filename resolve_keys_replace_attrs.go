@@ -79,12 +79,12 @@ func sinkGraylog(options *ResolveReplaceOptions) sink {
 	}
 
 	return sink{
-		// builtins are going to be the FINAL key namess for the 4 builtin fields on slog.Record.
+		// builtins are going to be the FINAL key names for the 4 builtin fields on slog.Record.
 		// We will also add in any fields we want incremented, if they would be assigned a special value by graylog.
 		// In this case, we want to increment "message" regardless of whether it will be overwritten by the "msg" builtin or not.
 		builtins: []string{slog.TimeKey, slog.LevelKey, finalMsgKey, "sourceLoc", "message"},
 		replacers: map[string]attrReplacer{
-			// "timestamp" is the time of the record. Defaults to the time the log was received by grayload.
+			// "timestamp" is the time of the record. Defaults to the time the log was received by graylog.
 			// If using a json extractor or rule, Graylog needs to have it set to a time object, not a string.
 			// So best to let your timestamp come in under a different key, then set it specifically with a pipeline rule.
 			"timestamp": {key: "timestampRenamed"},
@@ -125,7 +125,7 @@ func sinkStackdriver(options *ResolveReplaceOptions) sink {
 	}
 
 	return sink{
-		// builtins are going to be the FINAL key namess for the 4 builtin fields on slog.Record.
+		// builtins are going to be the FINAL key names for the 4 builtin fields on slog.Record.
 		// We will also add in any fields we want incremented, if they would be assigned a special value by graylog.
 		// In this case, we want to increment "message" regardless of whether it will be overwritten by the "msg" builtin or not.
 		builtins: []string{slog.TimeKey, "severity", finalMsgKey, "logging.googleapis.com/sourceLocation", "message"},
@@ -189,6 +189,23 @@ func sinkStackdriver(options *ResolveReplaceOptions) sink {
 	}
 }
 
+// ReplaceAttrCloudwatch returns a ReplaceAttr function works for Cloudwatch
+// (AWS Cloudwatch Logs, Cloudwatch Log Insights, etc).
+// https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/AnalyzingLogData.html
+// ResolveReplaceOptions are currently ignored for Cloudwatch.
+// Cloudwatch does not need a ResolveKey function at this point.
+func ReplaceAttrCloudwatch(_ *ResolveReplaceOptions) func(groups []string, a slog.Attr) slog.Attr {
+	// Output the top level time argument with a specific format,
+	// Because AWS Cloudwatch sorts time as a string instead of as a time.
+	const RFC3339NanoConstantSize = "2006-01-02T15:04:05.000000000Z07:00"
+	return func(groups []string, a slog.Attr) slog.Attr {
+		if groups == nil && a.Key == slog.TimeKey && a.Value.Kind() == slog.KindTime {
+			return slog.String(a.Key, a.Value.Time().Format(RFC3339NanoConstantSize))
+		}
+		return a
+	}
+}
+
 // sink represents the final destination of the logs.
 type sink struct {
 	// Only the keys that will be used for the builtins:
@@ -217,7 +234,7 @@ func resolveKeys(dest sink) func(groups []string, key string, index int) (string
 	// Only the final/sink handler knows what keys will be used.
 	// So avoid situations like "source", where we might have an added
 	// field already named "sourceLoc", and then later when the
-	// builtin "source" is logged by the sink it get replaced with
+	// builtin "source" is logged by the sink it gets replaced with
 	// "sourceLoc", ending up with duplicates.
 	// Example: slog.Info("main", slog.String(slog.MessageKey, "hello"), slog.String("message", "world"))
 	// Should, if using Graylog or Stackdriver, come out as:
@@ -227,7 +244,7 @@ func resolveKeys(dest sink) func(groups []string, key string, index int) (string
 			return key, true
 		}
 
-		// Check replacers first. (slog.Record built fields are not present, see above comment)
+		// Check replacers first. (slog.Record builtin fields are not present, see above comment)
 		for oldKey, replacement := range dest.replacers {
 			if key == oldKey {
 				key = replacement.key
