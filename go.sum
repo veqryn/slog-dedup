@@ -1,7 +1,7 @@
 github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec h1:W09IVJc94icq4NjY3clb7Lk8O1qJ8BdBEF8z0ibU0rE=
 github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec/go.mod h1:qqbHyh8v60DhA7CoWK5oRCqLrMHRGoxYCSS9EjAz6Eo=
-modernc.org/b/v2 v2.1.2 h1:PX71mrgWbZV3325fh6yVnzAuMU1qU+OX/bud9wmqbII=
-modernc.org/b/v2 v2.1.2/go.mod h1:Xyvaj/0l3N2tUButg4o32FUWXhhQ9tCePmQwQYVJLXQ=
+modernc.org/b/v2 v2.1.3 h1:4wBQpmeYwrbZSTOhUJU3X60vH3mFilNATMP8gEM87ns=
+modernc.org/b/v2 v2.1.3/go.mod h1:Xyvaj/0l3N2tUButg4o32FUWXhhQ9tCePmQwQYVJLXQ=
 modernc.org/mathutil v1.6.0 h1:fRe9+AmYlaej+64JsEEhoWuAYBkOtQiMEU7n/XgfYi4=
 modernc.org/mathutil v1.6.0/go.mod h1:Ui5Q9q1TR2gFm0AQRqQUaBWFLAhQpCwNcuhBOSedWPo=
 modernc.org/strutil v1.2.0 h1:agBi9dp1I+eOnxXeiZawM8F4LawKv4NzGWSaLfyeNZA=
